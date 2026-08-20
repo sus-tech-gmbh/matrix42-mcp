@@ -2,11 +2,12 @@
 
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { ToolContext, ToolDefinition } from './types.js';
+import { schemaDiscoveryTool } from './schema-discovery.js';
 import { serverInfoTool } from './server-info.js';
 import { webserviceDiscoveryTool } from './webservice-discovery.js';
 
 /** Every tool known to this server, in the order they are documented. */
-export const ALL_TOOLS: ToolDefinition[] = [serverInfoTool, webserviceDiscoveryTool];
+export const ALL_TOOLS: ToolDefinition[] = [serverInfoTool, webserviceDiscoveryTool, schemaDiscoveryTool];
 
 /** Resolves which tools to expose: an explicit allow-list, or all of them when none is given. */
 export function selectTools(enabled: string[]): { tools: ToolDefinition[]; unknown: string[] } {

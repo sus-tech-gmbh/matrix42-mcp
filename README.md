@@ -16,7 +16,8 @@ your credentials.
 ## Why
 
 Matrix42's API surface is large (a typical instance exposes ~190 web services and ~1,100 operations),
-and an assistant has no way to know what exists. Point it at this server and it can search for the
+plus a data model of ~800 data definitions and ~240 configuration items, and an assistant has no way
+to know what exists. Point it at this server and it can search for the
 right endpoint, read the exact contract, and then write correct integration code — instead of
 guessing at URLs, auth, and headers.
 
@@ -28,6 +29,7 @@ guessing at URLs, auth, and headers.
 | --- | --- |
 | `server_info` | Reports which Matrix42 instance is connected and verifies the credentials work. Never returns credentials. |
 | `webservice_discovery` | Discovers the REST API. See the actions below. |
+| `schema_discovery` | Explores the data model: data definitions, configuration items, attributes, relations, pickup values. |
 
 ### `webservice_discovery` actions
 
@@ -41,7 +43,24 @@ guessing at URLs, auth, and headers.
 **Typical flow:** `api_overview` once → `list_operations` with a search term → `describe_operation`
 on the one you want.
 
-Both tools are annotated `readOnlyHint: true`, so clients can distinguish them from anything that
+### `schema_discovery` actions
+
+| Action | Parameters | Returns |
+| --- | --- | --- |
+| `schema_overview` | – | How the Matrix42 data model fits together: data definitions vs configuration items, fragments and multi-fragments, cardinality, pickups, and where to find the official docs. |
+| `list_data_definitions` | `search?`, `include_pickups?`, `limit?` | Definitions as `{internalName, displayName, description, classType, isPickup, isCustom}`. Pickup classes are excluded unless asked for. |
+| `list_configuration_items` | `search?`, `limit?` | Items with their main class and member definitions. |
+| `describe_data_definition` | `name`, `include?` | Attributes with decoded datatypes and pickup cross-links. Relations are excluded by default (a central definition can have 150+) — pass `include: "relations"` or `"both"`. |
+| `describe_configuration_item` | `name` | The definitions an object is composed of, each with its cardinality and a `isMultiFragment` flag. |
+| `get_pickup_values` | `pickup_class` **or** `name`+`attribute` | The selectable `{value, label}` pairs — so a model filters on real values instead of guessing codes. |
+
+**Typical flow:** `schema_overview` → `list_*` with a search term → `describe_*` → `get_pickup_values`
+before filtering on any pickup attribute.
+
+Numeric enums are decoded for you (`Datatype: 2` → `"Int"`, `Cardinality: 3` → `"Optional (Multi)"`),
+and customisations are flagged using the custom prefix the instance itself reports.
+
+All three tools are annotated `readOnlyHint: true`, so clients can distinguish them from anything that
 would change data.
 
 ---
@@ -216,7 +235,9 @@ src/
   config.ts          environment configuration + validation
   m42-client.ts      authenticated HTTP client (token exchange, caching, TLS)
   discovery.ts       fragment queries + projections for services/operations
+  schema.ts          schema listings, detail projections, enum decoding, pickup resolution
   api-overview.ts    the static Matrix42 API guide served by api_overview
+  schema-overview.ts the static data-model guide served by schema_overview
   tools/             one module per tool, registered from a small registry
 ```
 
@@ -227,9 +248,9 @@ then works in `M42_TOOLS` automatically.
 
 ## Roadmap
 
+- ASQL validation (as its own tool)
 - Executing API operations (kept as a separate, explicitly annotated tool so read-only discovery and
   live calls can never be confused)
-- Schema/data-definition discovery
 - Read access to business records
 
 ---

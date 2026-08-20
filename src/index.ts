@@ -23,6 +23,12 @@ Use the webservice_discovery tool to work with the API:
     read this before writing any standalone Matrix42 integration code for the user.
   - action='list_operations' with a 'search' term to find an endpoint.
   - action='describe_operation' with an operation_id for its parameters and return type.
+Use the schema_discovery tool to explore the data model:
+  - action='schema_overview' explains data definitions vs configuration items, fragments,
+    cardinality and pickups — read this before reasoning about Matrix42 data.
+  - action='list_data_definitions' / 'list_configuration_items' to find schema objects.
+  - action='describe_data_definition' / 'describe_configuration_item' for their structure.
+  - action='get_pickup_values' for the valid values of a pickup attribute (never guess these).
 Use server_info to see which instance is connected.
 
 All tools are read-only: they return API metadata, not business records.`;

@@ -6,7 +6,11 @@ import { DEFAULT_OPERATION_LIMIT, limitResults } from '../src/tools/webservice-d
 
 describe('ALL_TOOLS', () => {
   it('exposes the expected tool ids', () => {
-    expect(ALL_TOOLS.map((tool) => tool.id)).toEqual(['server_info', 'webservice_discovery']);
+    expect(ALL_TOOLS.map((tool) => tool.id)).toEqual([
+      'server_info',
+      'webservice_discovery',
+      'schema_discovery',
+    ]);
   });
 
   it('gives every tool a non-empty summary', () => {
