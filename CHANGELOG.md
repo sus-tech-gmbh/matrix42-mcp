@@ -6,6 +6,17 @@ Notable changes to this project. Release notes are also generated automatically 
 This project follows [Semantic Versioning](https://semver.org). Until 1.0.0, minor versions may
 contain breaking changes to tool inputs; they will always be called out here.
 
+## 0.1.5 — 2026-08-21
+
+### Changed
+
+- **The ASQL guide now says that people and roles on a ticket are relations.** It explained dot
+  chains in the abstract, which was not enough to stop a name filter looking reasonable: a ticket
+  has no `InitiatorName` column, so `Initiator`, `Recipient` and `RecipientRole` have to be
+  traversed. The guide names the working expressions, including the `T(SPSSecurityClassRole)` pivot
+  a role needs because `SPSScRoleClassBase` carries no attributes of its own. A test pins the
+  lesson so it cannot quietly disappear.
+
 ## 0.1.4 — 2026-08-21
 
 ### Added

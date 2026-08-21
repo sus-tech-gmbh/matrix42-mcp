@@ -55,6 +55,17 @@ A relation or pickup attribute can be followed with a dot to reach the target de
 
 A chain ends at a plain attribute. Pickups behave like relations for chaining.
 
+People and roles are relations, not names. A ticket has no InitiatorName column — Initiator,
+Recipient and RecipientRole point at another definition, so filter through them:
+
+  Initiator.LastName = 'Smith'                              -- SPSUserClassBase behind the relation
+  Recipient.MailAddress LIKE '%@example.com'
+  RecipientRole.T(SPSSecurityClassRole).Name = 'Service Desk'
+
+The last one pivots with T(...) because SPSScRoleClassBase carries no attributes of its own. Read the
+target definition with describe_data_definition rather than guessing an attribute name, and check the
+expression with validate_asql before you rely on the result.
+
 ## Pickups — .Value and .DisplayString
 
 A pickup attribute exposes both the stored number and its localised label:

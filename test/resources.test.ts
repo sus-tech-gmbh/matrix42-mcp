@@ -44,6 +44,15 @@ describe('GUIDE_RESOURCES', () => {
     const dataModel = GUIDE_RESOURCES.find((guide) => guide.name === 'data-model');
     expect(dataModel?.text).toMatch(/never guess an attribute name/i);
   });
+
+  it('teaches that a ticket person column is a relation, which a name filter silently ignores', () => {
+    // Filtering by initiator_name once returned every ticket instead of failing. The guide has to
+    // say why: Initiator points at another definition, so the filter has to traverse it.
+    const asql = GUIDE_RESOURCES.find((guide) => guide.name === 'asql');
+    expect(asql?.text).toMatch(/no InitiatorName column/i);
+    expect(asql?.text).toContain("Initiator.LastName = 'Smith'");
+    expect(asql?.text).toMatch(/T\(SPSSecurityClassRole\)/);
+  });
 });
 
 describe('registerResources', () => {
