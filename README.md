@@ -18,18 +18,9 @@ The server holds the credentials and talks to Matrix42 on the assistant's behalf
 API-token exchange, sets the `Explicit-Language` header, and handles TLS. **The assistant never sees
 your credentials.**
 
-```mermaid
-flowchart LR
-    A["🧑 You"] --> B["🤖 AI assistant<br/>Claude · Cursor · Copilot"]
-    B <-->|"MCP over stdio"| C["matrix42-mcp"]
-    C <-->|"REST · token exchange<br/>TLS · Explicit-Language"| D[("Matrix42<br/>instance")]
-
-    C -.- E["🔒 Credentials stay here<br/>never reach the assistant"]
-
-    style C fill:#2f7d95,stroke:#1d4f5e,color:#fff
-    style D fill:#4a5568,stroke:#2d3748,color:#fff
-    style E fill:#fff8e1,stroke:#f0ad4e,color:#663c00
-```
+<p align="center">
+  <img src="docs/assets/overview.svg" alt="You ask an AI assistant; the assistant talks to matrix42-mcp over MCP; matrix42-mcp talks to your Matrix42 instance over REST. Credentials stay in the server and never reach the assistant." width="900">
+</p>
 
 ```bash
 npx matrix42-mcp --help
@@ -81,34 +72,13 @@ guessing at URLs, auth, and headers.
 
 ## What it can do
 
-```mermaid
-mindmap
-  root(("matrix42-mcp"))
-    Discover
-      ~1,100 API operations
-      Full request/return contracts
-      Public vs product API
-    Understand
-      785 data definitions
-      237 configuration items
-      Pickup values
-      Relations and cardinality
-    Read
-      ASQL queries with paging
-      Saved views
-      Journal and attachments
-      Deep links into the UI
-    Service desk
-      Search 7 ticket kinds by name
-      Service levels
-      13 curated domains
-      Search everything at once
-    Act
-      Create · close · classify
-      Take over · forward · pause
-      Reopen · deadline · time
-      Preview before every write
-```
+| | |
+| --- | --- |
+| **Discover the API** | ~1,100 operations with full request and return contracts, and whether each is update-safe |
+| **Understand the model** | 785 data definitions, 237 configuration items, pickup values, relations and cardinality |
+| **Read records** | ASQL queries with paging, saved views, journal, attachments, and links into the web interface |
+| **Work the service desk** | Search seven ticket kinds by name, service levels, thirteen curated domains, or search all of them at once |
+| **Act on tickets** | Create, close, classify, take over, forward, pause, reopen, set deadlines, track time — each previewed first |
 
 ## Tools
 
@@ -127,25 +97,9 @@ mindmap
 
 The assistant works it out without you naming a single id:
 
-```mermaid
-sequenceDiagram
-    participant You
-    participant AI as Assistant
-    participant S as matrix42-mcp
-    participant M as Matrix42
-
-    You->>AI: "Ada's open tickets, any past SLA?"
-    AI->>S: service_desk(search_tickets, initiator_name "Ada Lovelace")
-    S->>M: GET api/ticket/Search?InitiatorName=Ada+Lovelace
-    M-->>S: 4 tickets
-    S-->>AI: rows + object ids
-    loop each ticket
-        AI->>S: service_desk(sla_for_ticket)
-        S->>M: GET api/activity/suitableSLAsForTicket
-    end
-    AI->>S: data_query(deep_link) for the one at risk
-    AI-->>You: "3 open, TCK00182 breaches in 2h" + link
-```
+<p align="center">
+  <img src="docs/assets/example.svg" alt="The assistant searches tickets by the person's name, checks the service level of each, builds a deep link for the one at risk, and answers — without looking up a single id or writing anything." width="900">
+</p>
 
 Note what did **not** happen: no GUID lookups, no guessed attribute names, and nothing was written.
 
@@ -495,35 +449,9 @@ the end; nothing pre-existing is modified and no notification e-mail is ever req
 
 ### How it fits together
 
-```mermaid
-flowchart TD
-    subgraph MCP["MCP surface"]
-        T["6 tools"]
-        R["4 resources<br/>the written guides"]
-        P["5 prompts"]
-    end
-
-    subgraph DOM["Domain"]
-        SD["service-desk.ts<br/>tickets · SLAs"]
-        DM["domains.ts<br/>13 curated domains"]
-        TV["ticket-verbs.ts<br/>lifecycle"]
-        DL["deep-links.ts"]
-    end
-
-    subgraph SAFE["Correctness and safety"]
-        CO["columns.ts<br/>resolve against live schema"]
-        WP["write-plan.ts<br/>preview = the request"]
-    end
-
-    CL["m42-client.ts<br/>token exchange · TLS"]
-    M42[("Matrix42")]
-
-    MCP --> DOM --> SAFE --> CL --> M42
-
-    style SAFE fill:#fff8e1,stroke:#f0ad4e,color:#663c00
-    style CL fill:#2f7d95,stroke:#1d4f5e,color:#fff
-    style M42 fill:#4a5568,stroke:#2d3748,color:#fff
-```
+<p align="center">
+  <img src="docs/assets/architecture.svg" alt="Layered architecture: the MCP surface sits on domain modules, which sit on the correctness and safety layer, which sits on the authenticated client." width="900">
+</p>
 
 Two modules carry the guarantees the rest of the server relies on: `columns.ts` means no projection
 is ever sent that the instance cannot answer, and `write-plan.ts` means a preview and its request

@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 430" width="900" height="430" role="img" aria-label="A worked example: you ask which open tickets Ada Lovelace is waiting on. The assistant searches by name, checks service levels per ticket, builds a deep link, and answers. No ids are looked up and nothing is written.">
+  <defs>
+    <style>
+      .actor { font: 600 13px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      .msg   { font: 500 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #334155; }
+      .note  { font: 400 12px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      .line  { stroke: #cbd5e1; stroke-width: 1.5; stroke-dasharray: 4 4; }
+      .arrow { stroke: #64748b; stroke-width: 1.6; fill: none; }
+    </style>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <!-- actors -->
+  <rect x="20"  y="16" width="110" height="34" rx="8" fill="#e2e8f0" stroke="#94a3b8"/>
+  <text x="75"  y="38" text-anchor="middle" class="actor" fill="#1e293b">You</text>
+  <rect x="250" y="16" width="130" height="34" rx="8" fill="#5a67d8" stroke="#434190"/>
+  <text x="315" y="38" text-anchor="middle" class="actor" fill="#ffffff">Assistant</text>
+  <rect x="500" y="16" width="150" height="34" rx="8" fill="#2f7d95" stroke="#1d4f5e"/>
+  <text x="575" y="38" text-anchor="middle" class="actor" fill="#ffffff">matrix42-mcp</text>
+  <rect x="770" y="16" width="110" height="34" rx="8" fill="#4a5568" stroke="#2d3748"/>
+  <text x="825" y="38" text-anchor="middle" class="actor" fill="#ffffff">Matrix42</text>
+
+  <!-- lifelines -->
+  <line class="line" x1="75"  y1="50" x2="75"  y2="360"/>
+  <line class="line" x1="315" y1="50" x2="315" y2="360"/>
+  <line class="line" x1="575" y1="50" x2="575" y2="360"/>
+  <line class="line" x1="825" y1="50" x2="825" y2="360"/>
+
+  <!-- 1 -->
+  <path class="arrow" d="M 75 82 L 308 82" marker-end="url(#a2)"/>
+  <text x="88" y="76" class="msg">“Ada’s open tickets — any past their SLA?”</text>
+
+  <!-- 2 -->
+  <path class="arrow" d="M 315 122 L 568 122" marker-end="url(#a2)"/>
+  <text x="326" y="116" class="msg">search_tickets(initiator_name: "Ada Lovelace")</text>
+
+  <!-- 3 -->
+  <path class="arrow" d="M 575 158 L 818 158" marker-end="url(#a2)"/>
+  <text x="586" y="152" class="msg">GET api/ticket/Search?InitiatorName=…</text>
+
+  <!-- 4 -->
+  <path class="arrow" d="M 825 190 L 582 190" marker-end="url(#a2)"/>
+  <text x="600" y="184" class="msg">4 tickets, 3 open</text>
+
+  <!-- loop box -->
+  <rect x="300" y="212" width="540" height="62" rx="7" fill="#f8fafc" stroke="#cbd5e1"/>
+  <rect x="300" y="212" width="86" height="19" rx="7" fill="#cbd5e1"/>
+  <text x="343" y="226" text-anchor="middle" class="note" fill="#1e293b">per ticket</text>
+  <path class="arrow" d="M 315 256 L 568 256" marker-end="url(#a2)"/>
+  <text x="326" y="250" class="msg">sla_for_ticket(object_id)</text>
+
+  <!-- 5 -->
+  <path class="arrow" d="M 315 300 L 568 300" marker-end="url(#a2)"/>
+  <text x="326" y="294" class="msg">deep_link(ci_name, object_id)</text>
+
+  <!-- 6 -->
+  <path class="arrow" d="M 308 340 L 75 340" marker-end="url(#a2)"/>
+  <text x="88" y="334" class="msg">“3 open. TCK00182 breaches in 2h” + link</text>
+
+  <!-- takeaway -->
+  <rect x="20" y="372" width="860" height="44" rx="9" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5"/>
+  <text x="450" y="391" text-anchor="middle" class="note" fill="#14532d">No GUIDs looked up. No attribute names guessed. Nothing written.</text>
+  <text x="450" y="408" text-anchor="middle" class="note" fill="#166534">Names go straight into the filter, and every column is resolved against the live schema first.</text>
+</svg>

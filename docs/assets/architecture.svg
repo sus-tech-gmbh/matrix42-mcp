@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 400" width="900" height="400" role="img" aria-label="Layered architecture: the MCP surface of tools, resources and prompts sits on domain modules, which sit on the correctness and safety layer of columns.ts and write-plan.ts, which sits on the authenticated client, which talks to Matrix42.">
+  <defs>
+    <style>
+      .h    { font: 700 13px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; letter-spacing: .04em; }
+      .n    { font: 600 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+      .d    { font: 400 11.5px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+      .flow { stroke: #94a3b8; stroke-width: 2; fill: none; }
+    </style>
+    <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a3b8"/>
+    </marker>
+  </defs>
+
+  <!-- MCP surface -->
+  <rect x="30" y="16" width="840" height="76" rx="10" fill="#eef2ff" stroke="#c7d2fe" stroke-width="1.5"/>
+  <text x="48" y="38" class="h" fill="#3730a3">MCP SURFACE</text>
+  <rect x="60"  y="46" width="240" height="34" rx="7" fill="#5a67d8"/>
+  <text x="180" y="68" text-anchor="middle" class="n" fill="#ffffff">6 tools</text>
+  <rect x="330" y="46" width="240" height="34" rx="7" fill="#5a67d8"/>
+  <text x="450" y="68" text-anchor="middle" class="n" fill="#ffffff">4 resources · the guides</text>
+  <rect x="600" y="46" width="240" height="34" rx="7" fill="#5a67d8"/>
+  <text x="720" y="68" text-anchor="middle" class="n" fill="#ffffff">5 prompts</text>
+
+  <!-- Domain -->
+  <rect x="30" y="112" width="840" height="84" rx="10" fill="#f0f9ff" stroke="#bae6fd" stroke-width="1.5"/>
+  <text x="48" y="134" class="h" fill="#075985">DOMAIN</text>
+  <rect x="60"  y="142" width="185" height="42" rx="7" fill="#ffffff" stroke="#7dd3fc"/>
+  <text x="152" y="160" text-anchor="middle" class="n" fill="#0c4a6e">service-desk.ts</text>
+  <text x="152" y="175" text-anchor="middle" class="d" fill="#0369a1">tickets · service levels</text>
+  <rect x="262" y="142" width="185" height="42" rx="7" fill="#ffffff" stroke="#7dd3fc"/>
+  <text x="354" y="160" text-anchor="middle" class="n" fill="#0c4a6e">domains.ts</text>
+  <text x="354" y="175" text-anchor="middle" class="d" fill="#0369a1">13 curated domains</text>
+  <rect x="464" y="142" width="185" height="42" rx="7" fill="#ffffff" stroke="#7dd3fc"/>
+  <text x="556" y="160" text-anchor="middle" class="n" fill="#0c4a6e">ticket-verbs.ts</text>
+  <text x="556" y="175" text-anchor="middle" class="d" fill="#0369a1">the lifecycle</text>
+  <rect x="666" y="142" width="174" height="42" rx="7" fill="#ffffff" stroke="#7dd3fc"/>
+  <text x="753" y="160" text-anchor="middle" class="n" fill="#0c4a6e">deep-links.ts</text>
+  <text x="753" y="175" text-anchor="middle" class="d" fill="#0369a1">links into the UI</text>
+
+  <!-- Safety -->
+  <rect x="30" y="216" width="840" height="84" rx="10" fill="#fff8e1" stroke="#f0ad4e" stroke-width="2"/>
+  <text x="48" y="238" class="h" fill="#663c00">CORRECTNESS AND SAFETY</text>
+  <rect x="60"  y="246" width="385" height="42" rx="7" fill="#ffffff" stroke="#f0ad4e"/>
+  <text x="252" y="264" text-anchor="middle" class="n" fill="#663c00">columns.ts</text>
+  <text x="252" y="279" text-anchor="middle" class="d" fill="#8a5a00">no projection is sent the instance cannot answer</text>
+  <rect x="462" y="246" width="378" height="42" rx="7" fill="#ffffff" stroke="#f0ad4e"/>
+  <text x="651" y="264" text-anchor="middle" class="n" fill="#663c00">write-plan.ts</text>
+  <text x="651" y="279" text-anchor="middle" class="d" fill="#8a5a00">the preview IS the request that gets sent</text>
+
+  <!-- client + M42 -->
+  <rect x="30" y="320" width="410" height="56" rx="10" fill="#2f7d95" stroke="#1d4f5e" stroke-width="1.5"/>
+  <text x="235" y="344" text-anchor="middle" class="n" fill="#ffffff">m42-client.ts</text>
+  <text x="235" y="362" text-anchor="middle" class="d" fill="#cfe9f2">token exchange · caching · TLS</text>
+
+  <rect x="560" y="320" width="310" height="56" rx="10" fill="#4a5568" stroke="#2d3748" stroke-width="1.5"/>
+  <text x="715" y="344" text-anchor="middle" class="n" fill="#ffffff">Matrix42</text>
+  <text x="715" y="362" text-anchor="middle" class="d" fill="#cbd5e0">your instance</text>
+
+  <path class="flow" d="M 450 92 L 450 108" marker-end="url(#a3)"/>
+  <path class="flow" d="M 450 196 L 450 212" marker-end="url(#a3)"/>
+  <path class="flow" d="M 450 300 L 450 316" marker-end="url(#a3)"/>
+  <path class="flow" d="M 440 348 L 553 348" marker-start="url(#a3)" marker-end="url(#a3)"/>
+</svg>

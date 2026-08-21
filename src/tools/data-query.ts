@@ -96,6 +96,12 @@ export const dataQueryTool: ToolDefinition = {
             .describe(
               "Configuration item internal name, e.g. 'SPSActivityTypeIncident'. Required for action='get_object'.",
             ),
+          verify: z
+            .boolean()
+            .optional()
+            .describe(
+              "For action='deep_link': resolve the object before returning the link, so a dead link is reported rather than handed over. Defaults to true.",
+            ),
           link_kind: z
             .enum(['object', 'create'])
             .optional()
@@ -148,6 +154,7 @@ export const dataQueryTool: ToolDefinition = {
         fragment_id,
         ci_name,
         object_id,
+        verify,
         link_kind,
         link_view_id,
         application,
@@ -230,6 +237,21 @@ export const dataQueryTool: ToolDefinition = {
                 return errorResult(
                   "deep_link needs 'ci_name' — the configuration item, e.g. SPSActivityTypeIncident.",
                 );
+              }
+              // A link built from the wrong configuration item, or from a fragment id, looks
+              // perfectly valid and opens nothing. Resolve it first so a dead link is reported
+              // here rather than discovered by whoever clicks it.
+              if (object_id && verify !== false) {
+                const resolved = await getObject(client, ci_name, object_id);
+                if (resolved === null) {
+                  return errorResult(
+                    `No object ${object_id} of configuration item '${ci_name}', so this link would open nothing. ` +
+                      'Two things commonly cause that: the id is a FRAGMENT id rather than the object id ' +
+                      '(select [Expression-ObjectID] to get the right one), or the object belongs to a ' +
+                      "different configuration item — check the class's usedInConfigurationItems with " +
+                      'schema_discovery. Pass verify:false to build the link anyway.',
+                  );
+                }
               }
               try {
                 const link = buildDeepLink({
