@@ -6,7 +6,14 @@ Notable changes to this project. Release notes are also generated automatically 
 This project follows [Semantic Versioning](https://semver.org). Until 1.0.0, minor versions may
 contain breaking changes to tool inputs; they will always be called out here.
 
-## Unreleased
+## 0.1.1 — 2026-08-21
+
+No functional changes. This is the first release published from CI through
+[npm trusted publishing](https://docs.npmjs.com/trusted-publishers), so it is the first tarball to
+carry [provenance](https://docs.npmjs.com/generating-provenance-statements) linking it to the commit
+and workflow run that built it. 0.1.0 was published by hand to create the package.
+
+## 0.1.0 — 2026-08-21
 
 ### Added
 
