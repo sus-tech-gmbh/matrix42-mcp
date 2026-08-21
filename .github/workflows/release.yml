@@ -1,14 +1,27 @@
 name: Release
 
-# Publishing is driven by tags: `npm version <patch|minor|major>` then
-# `git push --follow-tags`. Nothing publishes from a laptop.
+# Publishes to npm when a GitHub Release is published. The release is the human gate: nothing
+# reaches npm until someone deliberately publishes one.
+#
+# No NPM_TOKEN. This uses npm Trusted Publishing (OIDC), so npm trusts this repository and this
+# workflow file directly, and there is no long-lived credential to leak or rotate.
+#
+# ONE-TIME SETUP on npmjs.com, under the matrix42-mcp package -> Settings -> Trusted Publisher:
+#     Organization or user: sus-tech-gmbh
+#     Repository:           matrix42-mcp
+#     Workflow filename:    release.yml      <- must match this file's name EXACTLY, including .yml
+#
+# The package must already exist on npm before that setting appears, so the very first publish is
+# a manual `npm publish` from a maintainer's machine. Every release after that is automatic.
+
 on:
-  push:
-    tags: ['v*']
+  release:
+    types: [published]
+  workflow_dispatch:
 
 permissions:
-  contents: write   # create the GitHub release
-  id-token: write   # npm provenance via OIDC
+  contents: read
+  id-token: write # required for OIDC trusted publishing and provenance
 
 jobs:
   verify:
@@ -32,42 +45,32 @@ jobs:
     name: Publish to npm
     needs: verify
     runs-on: ubuntu-latest
-    environment: release
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22.x'
           cache: npm
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: https://registry.npmjs.org
+
+      # Trusted publishing needs npm >= 11.5.1, which is newer than the bundled version.
+      - run: npm install -g npm@latest
 
       - run: npm ci
 
-      # The tag and package.json must agree, or a mistyped tag ships the wrong version.
-      - name: Check the tag matches package.json
+      # A release tagged v1.2.3 must carry version 1.2.3, or a mistyped tag ships the wrong thing.
+      # Skipped for a manual dispatch, which has no tag to compare against.
+      - name: Check the release tag matches package.json
+        if: github.event_name == 'release'
         run: |
           TAG="${GITHUB_REF_NAME#v}"
           PKG="$(node -p "require('./package.json').version")"
           if [ "$TAG" != "$PKG" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match package.json version $PKG" >&2
+            echo "Release tag $GITHUB_REF_NAME does not match package.json version $PKG" >&2
             exit 1
           fi
           echo "Publishing $PKG"
 
-      # --provenance links the tarball to this workflow run, so consumers can verify
-      # it was built from this commit rather than uploaded by hand.
-      - name: Publish
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Create the GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh release create "$GITHUB_REF_NAME" \
-            --title "$GITHUB_REF_NAME" \
-            --generate-notes \
-            --verify-tag
+      # Provenance is generated automatically under OIDC; the flag makes the intent explicit and
+      # fails loudly if the conditions for it are ever not met.
+      - run: npm publish --provenance --access public

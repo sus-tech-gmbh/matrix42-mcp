@@ -557,7 +557,7 @@ Community support only, through
 | **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
 | **Releases** | [GitHub releases](https://github.com/sus-tech-gmbh/matrix42-mcp/releases) |
 
-Releases are published from CI on a tag, with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) — the tarball on npm is cryptographically linked to the commit and workflow run that built it.
+Releases are published from CI when a GitHub Release is published, using [npm trusted publishing](https://docs.npmjs.com/trusted-publishers) — no long-lived npm token exists anywhere, and every tarball carries [provenance](https://docs.npmjs.com/generating-provenance-statements) linking it to the commit and workflow run that built it.
 
 ## Security
 
