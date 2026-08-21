@@ -8,8 +8,8 @@ The server holds the credentials and talks to Matrix42 on the assistant's behalf
 API-token exchange, sets the `Explicit-Language` header, and handles TLS. The assistant never sees
 your credentials.
 
-> **Status:** early release. Today every tool is **read-only** and returns *API metadata*, not
-> business records.
+> **Status:** early release. Every tool is **read-only** — the server reads API metadata, the data
+> model, and records, but never modifies anything.
 
 ---
 
@@ -30,6 +30,7 @@ guessing at URLs, auth, and headers.
 | `server_info` | Reports which Matrix42 instance is connected and verifies the credentials work. Never returns credentials. |
 | `webservice_discovery` | Discovers the REST API. See the actions below. |
 | `schema_discovery` | Explores the data model: data definitions, configuration items, attributes, relations, pickup values. |
+| `data_query` | Reads records: ASQL-filtered queries, single fragments, whole objects, plus an ASQL guide and validator. |
 
 ### `webservice_discovery` actions
 
@@ -57,10 +58,23 @@ on the one you want.
 **Typical flow:** `schema_overview` → `list_*` with a search term → `describe_*` → `get_pickup_values`
 before filtering on any pickup attribute.
 
+### `data_query` actions
+
+| Action | Parameters | Returns |
+| --- | --- | --- |
+| `asql_guide` | – | The ASQL expression language used by `where` and `columns`: operators, dot chains, pickups, `T(...)` pivots, subqueries, `[Expression-ObjectID]`. |
+| `validate_asql` | `class`, `expression` | Whether an expression is valid, with the exact error (e.g. *"does not contain attribute Nope"*). Cheaper than a failed query. |
+| `query` | `class`, `columns?`, `where?`, `sort?`, `page_size?`, `page?` | Rows plus typed column metadata, with paging (`hasMore`). |
+| `get_fragment` | `class`, `fragment_id` | One complete fragment. |
+| `get_object` | `ci_name`, `object_id` | One whole object (all fragments of a configuration item). |
+
+**Typical flow:** `asql_guide` once → `schema_discovery` to find the class and its pickup values →
+`validate_asql` → `query`. Always pass `sort` when paging; page boundaries are otherwise unstable.
+
 Numeric enums are decoded for you (`Datatype: 2` → `"Int"`, `Cardinality: 3` → `"Optional (Multi)"`),
 and customisations are flagged using the custom prefix the instance itself reports.
 
-All three tools are annotated `readOnlyHint: true`, so clients can distinguish them from anything that
+All tools are annotated `readOnlyHint: true`, so clients can distinguish them from anything that
 would change data.
 
 ---
@@ -238,6 +252,8 @@ src/
   schema.ts          schema listings, detail projections, enum decoding, pickup resolution
   api-overview.ts    the static Matrix42 API guide served by api_overview
   schema-overview.ts the static data-model guide served by schema_overview
+  data.ts            record queries, paging, result shaping, ASQL validation
+  asql-guide.ts      the static ASQL guide served by asql_guide
   tools/             one module per tool, registered from a small registry
 ```
 
@@ -248,7 +264,6 @@ then works in `M42_TOOLS` automatically.
 
 ## Roadmap
 
-- ASQL validation (as its own tool)
 - Executing API operations (kept as a separate, explicitly annotated tool so read-only discovery and
   live calls can never be confused)
 - Read access to business records

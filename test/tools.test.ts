@@ -10,6 +10,7 @@ describe('ALL_TOOLS', () => {
       'server_info',
       'webservice_discovery',
       'schema_discovery',
+      'data_query',
     ]);
   });
 

@@ -29,9 +29,15 @@ Use the schema_discovery tool to explore the data model:
   - action='list_data_definitions' / 'list_configuration_items' to find schema objects.
   - action='describe_data_definition' / 'describe_configuration_item' for their structure.
   - action='get_pickup_values' for the valid values of a pickup attribute (never guess these).
+Use the data_query tool to read actual records:
+  - action='asql_guide' for the ASQL expression language used by filters and column lists.
+  - action='validate_asql' to check a filter before running it — cheaper than a failed query.
+  - action='query' to read rows of a data definition, with paging and typed columns.
+  - action='get_fragment' / 'get_object' to fetch one record in full.
 Use server_info to see which instance is connected.
 
-All tools are read-only: they return API metadata, not business records.`;
+All tools are read-only. Prefer discovering the schema before querying: find the class, check the
+attributes, and read pickup values rather than guessing numeric codes.`;
 
 /** stdout belongs to the MCP protocol — every diagnostic goes to stderr. */
 function log(message: string): void {
