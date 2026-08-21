@@ -23,7 +23,7 @@ npm test
 npm run build
 ```
 
-All three must pass. CI runs them on Node 20, 22 and 24.
+All three must pass. CI runs them on Node 22 and 24.
 
 If you changed a guide (`src/domain-guide.ts`, `src/schema-overview.ts`, `src/asql-guide.ts`,
 `src/api-overview.ts`), also run:

@@ -1,7 +1,7 @@
 {
   "name": "matrix42-mcp",
   "version": "0.1.0",
-  "description": "Model Context Protocol server for Matrix42 \u2014 lets AI assistants explore the API, read the data model, search the service desk, and act on tickets",
+  "description": "Model Context Protocol server for Matrix42 — lets AI assistants explore the API, read the data model, search the service desk, and act on tickets",
   "type": "module",
   "license": "MIT",
   "bin": {
@@ -14,7 +14,7 @@
     "LICENSE"
   ],
   "engines": {
-    "node": ">=20"
+    "node": ">=22.19.0"
   },
   "scripts": {
     "build": "tsc",

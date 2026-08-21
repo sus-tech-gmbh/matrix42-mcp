@@ -267,7 +267,7 @@ Those files are generated from the guide modules (`npm run docs`), and a test fa
 
 ## Requirements
 
-- **Node.js 20 or newer**
+- **Node.js 22.19 or newer** (required by undici, the HTTP client)
 - A Matrix42 instance and either an **API token** (recommended) or basic-auth credentials
 
 ### Creating an API token
