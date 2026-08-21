@@ -16,3 +16,6 @@ dist/
 # Logs
 *.log
 npm-debug.log*
+
+# Local development notes — instance details, credentials, findings. Never committed.
+dev-notes/
