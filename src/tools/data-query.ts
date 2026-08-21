@@ -13,6 +13,7 @@ import {
 import { listAttachments, listJournal, listViews, runView } from '../objects.js';
 import { buildDeepLink } from '../deep-links.js';
 import { resolveObjectType } from '../objects.js';
+import { UiHostResolver } from '../ui-host.js';
 import { type ToolContext, type ToolDefinition, textResult, errorResult } from './types.js';
 
 /**
@@ -24,6 +25,7 @@ export const dataQueryTool: ToolDefinition = {
   summary: 'Read records: query data definitions with ASQL filters, fetch fragments and objects.',
 
   register(server: McpServer, { client, config }: ToolContext): void {
+    const uiHost = new UiHostResolver(config.baseUrl, config.uiUrl);
     server.registerTool(
       'data_query',
       {
@@ -264,22 +266,31 @@ export const dataQueryTool: ToolDefinition = {
                 );
               }
 
+              // The web interface is often served from a different origin than the API. Loading
+              // the shell from the wrong one leaves it calling an origin it was not served from,
+              // which fails after the page has already appeared to load.
+              const ui = await uiHost.resolve(client);
+
               try {
                 const link = buildDeepLink({
                   kind: link_kind ?? 'object',
-                  baseUrl: config.baseUrl,
+                  baseUrl: ui.origin,
                   typeName,
                   objectId: object_id,
                   widgetId: widget_id,
                   application,
                   presetParams: preset_params,
                 });
-                const payload = resolvedFrom
-                  ? {
-                      ...link,
-                      correctedConfigurationItem: `This object is a '${typeName}', not a '${resolvedFrom}' — the link uses the real one.`,
-                    }
-                  : link;
+                const payload: Record<string, unknown> = { ...link, webInterface: ui.origin };
+                if (ui.source === 'discovered') {
+                  payload.webInterfaceNote =
+                    'Origin taken from the instance\'s own web shell configuration, which is what the ' +
+                    'browser app calls. It can differ from the API host you connected to.';
+                }
+                if (ui.note) payload.webInterfaceNote = ui.note;
+                if (resolvedFrom) {
+                  payload.correctedConfigurationItem = `This object is a '${typeName}', not a '${resolvedFrom}' — the link uses the real one.`;
+                }
                 return textResult(JSON.stringify(payload, null, 2));
               } catch (error) {
                 return errorResult(error instanceof Error ? error.message : String(error));

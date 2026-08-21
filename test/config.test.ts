@@ -162,3 +162,21 @@ describe('audit note settings', () => {
     expect(loadConfig({ ...base, M42_AGENT_LABEL: '   ' }).agentLabel).toBe('Matrix42 MCP server');
   });
 })
+
+describe('web interface origin', () => {
+  const base = { M42_HOST: 'https://m42.example.com', M42_API_TOKEN: 't' };
+
+  it('is unset by default, so it gets discovered from the instance', () => {
+    expect(loadConfig(base).uiUrl).toBeUndefined();
+  });
+
+  it('can be pinned when an instance serves its UI somewhere unexpected', () => {
+    expect(loadConfig({ ...base, M42_UI_URL: '  https://portal.example.com  ' }).uiUrl).toBe(
+      'https://portal.example.com',
+    );
+  });
+
+  it('treats a blank value as unset rather than as an empty origin', () => {
+    expect(loadConfig({ ...base, M42_UI_URL: '   ' }).uiUrl).toBeUndefined();
+  });
+})

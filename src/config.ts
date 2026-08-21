@@ -32,6 +32,13 @@ export interface Config {
   auditNote: boolean;
   /** How the assistant is identified in that note. */
   agentLabel: string;
+  /**
+   * Origin of the web interface, when it differs from the API host.
+   *
+   * Left unset, it is discovered from the shell's own config.json. Set it when an instance serves
+   * its UUX somewhere the server cannot work out on its own.
+   */
+  uiUrl?: string;
 }
 
 /** Raised when the environment does not describe a usable configuration. */
@@ -116,6 +123,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     timeoutMs,
     auditNote: parseBool(env.M42_AUDIT_NOTE, true),
     agentLabel: env.M42_AGENT_LABEL?.trim() || DEFAULT_AGENT_LABEL,
+    uiUrl: env.M42_UI_URL?.trim() || undefined,
   };
 }
 

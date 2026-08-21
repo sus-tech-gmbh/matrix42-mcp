@@ -83,6 +83,7 @@ Configuration (environment variables):
   M42_ALLOW_WRITES         set to 1 to expose tools that modify data (default: read-only)
   M42_AUDIT_NOTE           set to 0 to stop marking created tickets as API-raised (default: on)
   M42_AGENT_LABEL          how the assistant is named in that note (default: Matrix42 MCP server)
+  M42_UI_URL               web interface origin for deep links (default: discovered)
   M42_ALLOW_INSECURE_TLS   set to 1 to skip TLS verification (self-signed dev instances only)
   M42_TIMEOUT_MS           per-request timeout, default 30000
 

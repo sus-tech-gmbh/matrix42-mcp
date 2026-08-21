@@ -222,8 +222,12 @@ optional (the web app declares its own route as `/object-details/:_type/:_id/:wi
 the real one for you rather than making you pick. Pass a wrong `ci_name` and it corrects it; pass a
 fragment id and it refuses instead of handing you a link that opens nothing.
 
-Links are built against the host you configured, which is reachable for you, rather than the
-instance's internal server name.
+**Links are built against the web interface's own origin, not the API host you connected to.**
+Those are often different: an instance reachable at an IP commonly serves its UUX under a real
+name, and the shell's `config.json` says which. Loading the shell from the wrong origin leaves the
+app calling an origin it was not served from, so the page appears to load and then fails. The
+server reads that origin from the instance and reports it as `webInterface` alongside the link.
+Override it with `M42_UI_URL` if your deployment needs something else.
 
 The same text is checked in under [`docs/`](docs/) so it is readable on GitHub without running
 anything — start with **[Matrix42 is one graph, not many modules](docs/matrix42-data-model.md)**,
@@ -263,6 +267,7 @@ All configuration is via environment variables.
 | `M42_ALLOW_INSECURE_TLS` | | `0` | Set to `1` to skip TLS verification (self-signed dev instances only) |
 | `M42_AUDIT_NOTE` | | `1` | Mark created tickets with an internal note saying they were raised through this server. Set to `0` to disable. |
 | `M42_AGENT_LABEL` | | `Matrix42 MCP server` | How the assistant is named in that note |
+| `M42_UI_URL` | | discovered | Origin of the web interface, for deep links. Discovered from the instance's web shell config when unset. |
 | `M42_TIMEOUT_MS` | | `30000` | Per-request timeout |
 
 ¹ Provide **either** `M42_API_TOKEN` **or** both `M42_USERNAME` and `M42_PASSWORD`.

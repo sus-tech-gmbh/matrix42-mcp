@@ -24,7 +24,9 @@ contain breaking changes to tool inputs; they will always be called out here.
 - **MCP resources** — the four written guides, also generated into `docs/` with a drift test.
 - **`data_query` action `deep_link`** — URLs into the Matrix42 web interface. Takes just an object’s
   id and resolves the configuration item itself, since a base definition is reused by many of them.
-  A fragment id is refused rather than turned into a link that opens nothing.
+  A fragment id is refused rather than turned into a link that opens nothing. Links target the web
+  interface's own origin, read from the instance's web shell config, because that is frequently not
+  the host the API is reached on; `M42_UI_URL` overrides it.
 - **Schema-driven column resolution.** Projections are resolved against the live schema before every
   query, so a field a module does not install is reported rather than sent.
 
