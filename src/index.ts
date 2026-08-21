@@ -5,12 +5,13 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { ConfigError, describeConfig, loadConfig } from './config.js';
 import { M42Client } from './m42-client.js';
+import { SERVER_VERSION } from './version.js';
 import { registerPrompts } from './prompts.js';
 import { registerResources } from './resources.js';
 import { ALL_TOOLS, registerTools, selectTools } from './tools/index.js';
 
 const SERVER_NAME = 'matrix42-mcp';
-const SERVER_VERSION = '0.1.0';
+
 
 /**
  * Orientation text sent to the client on connect, so the model knows what this server is for

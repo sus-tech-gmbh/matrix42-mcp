@@ -6,6 +6,14 @@ Notable changes to this project. Release notes are also generated automatically 
 This project follows [Semantic Versioning](https://semver.org). Until 1.0.0, minor versions may
 contain breaking changes to tool inputs; they will always be called out here.
 
+## 0.1.2 — 2026-08-21
+
+### Fixed
+
+- The CLI and the MCP handshake reported a hardcoded version that `npm version` never updated, so
+  0.1.1 introduced itself as 0.1.0. The version is now read from the package manifest, and a test
+  fails if the two ever disagree again.
+
 ## 0.1.1 — 2026-08-21
 
 No functional changes. This is the first release published from CI through
