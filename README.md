@@ -93,15 +93,15 @@ guessing at URLs, auth, and headers.
 
 ### What a conversation looks like
 
-> **You:** Which open tickets is Ada Lovelace waiting on, and are any of them past their service level?
+> **You:** Which open hardware tickets are still unresolved, and are any past their service level?
 
 The assistant works it out without you naming a single id:
 
 <p align="center">
-  <img src="docs/assets/example.svg" alt="The assistant searches tickets by the person's name, checks the service level of each, builds a deep link for the one at risk, and answers — without looking up a single id or writing anything." width="900">
+  <img src="docs/assets/example.svg" alt="The assistant searches tickets by category and state, checks the service level of each, builds a deep link for the one at risk, and answers — without looking up a single id or writing anything." width="900">
 </p>
 
-Note what did **not** happen: no GUID lookups, no guessed attribute names, and nothing was written.
+Note what did **not** happen: no GUID lookups, no guessed attribute names, and nothing was written. Note also what the server refuses: a filter Matrix42 accepts but never applies, so an unfiltered answer is never mistaken for a filtered one.
 
 ### `webservice_discovery` actions
 
