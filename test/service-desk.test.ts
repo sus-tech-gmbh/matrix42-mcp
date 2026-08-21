@@ -2,9 +2,11 @@
 
 import { describe, expect, it, vi } from 'vitest';
 import {
+  HONOURED_FILTERS,
   MATCH_ALL_SUBJECT,
   TICKET_KINDS,
   buildSearchQuery,
+  rejectIgnoredFilters,
   unwrapSearchResult,
   getTicketInfo,
   searchTickets,
@@ -57,26 +59,22 @@ describe('TICKET_KINDS', () => {
 });
 
 describe('buildSearchQuery', () => {
-  it('maps the tool parameters onto the contract field names', () => {
+  it('maps the honoured filters onto the contract field names', () => {
     const params = new URLSearchParams(
-      buildSearchQuery({
-        kind: 'incident',
-        ticketNumber: 'INC-1',
-        subject: 'printer',
-        states: '1,2',
-        categoryName: 'Hardware',
-        initiatorName: 'Ada',
-        recipientName: 'Grace',
-        recipientRoleName: 'Service Desk',
-      }),
+      buildSearchQuery({ kind: 'incident', subject: 'printer', states: '1,2', categoryName: 'Hardware' }),
     );
-    expect(params.get('TicketNumber')).toBe('INC-1');
     expect(params.get('Subject')).toBe('printer');
     expect(params.get('States')).toBe('1,2');
     expect(params.get('CategoryName')).toBe('Hardware');
-    expect(params.get('InitiatorName')).toBe('Ada');
-    expect(params.get('RecipientName')).toBe('Grace');
-    expect(params.get('RecipientRoleName')).toBe('Service Desk');
+  });
+
+  it('sends nothing Matrix42 would ignore', () => {
+    // Sending an ignored filter is what made an unfiltered result look filtered.
+    const params = new URLSearchParams(
+      buildSearchQuery({ kind: 'ticket', subject: 'x', initiatorName: 'Ada', ticketNumber: 'T1' }),
+    );
+    expect(params.get('InitiatorName')).toBeNull();
+    expect(params.get('TicketNumber')).toBeNull();
   });
 
   it('omits filters that were not supplied', () => {
@@ -92,8 +90,21 @@ describe('buildSearchQuery', () => {
     );
   });
 
-  it('does not add the fallback once any real filter is present', () => {
-    expect(new URLSearchParams(buildSearchQuery({ kind: 'ticket', states: '1' })).get('Subject')).toBeNull();
+  it('does not add the fallback once a field that stands alone is present', () => {
+    expect(
+      new URLSearchParams(buildSearchQuery({ kind: 'ticket', categoryName: 'Hardware' })).get('Subject'),
+    ).toBeNull();
+  });
+
+  it('companions States with a match-all subject, since it cannot stand alone', () => {
+    const params = new URLSearchParams(buildSearchQuery({ kind: 'ticket', states: '200' }));
+    expect(params.get('Subject')).toBe(MATCH_ALL_SUBJECT);
+  });
+
+  it('keeps a honoured filter alongside the fallback', () => {
+    const params = new URLSearchParams(buildSearchQuery({ kind: 'ticket', states: '200' }));
+    expect(params.get('States')).toBe('200');
+    expect(params.get('Subject')).toBe(MATCH_ALL_SUBJECT);
   });
 
   it('sends the "my items" flag together with the user it applies to', () => {
@@ -104,9 +115,9 @@ describe('buildSearchQuery', () => {
     expect(params.get('CurrentUserId')).toBe('u1');
   });
 
-  it('escapes a name so it survives as one filter value', () => {
-    const params = new URLSearchParams(buildSearchQuery({ kind: 'ticket', initiatorName: 'A & B' }));
-    expect(params.get('InitiatorName')).toBe('A & B');
+  it('escapes a value so it survives as one filter', () => {
+    const params = new URLSearchParams(buildSearchQuery({ kind: 'ticket', categoryName: 'A & B' }));
+    expect(params.get('CategoryName')).toBe('A & B');
   });
 });
 
@@ -340,18 +351,44 @@ describe('the "my items" filter, which is not criteria on its own', () => {
     expect(params.get('Subject')).toBe('printer');
   });
 
-  it('treats each real criteria field as sufficient on its own', () => {
-    for (const input of [
-      { ticketNumber: 'T1' },
-      { states: '1' },
-      { categoryName: 'HW' },
-      { initiatorName: 'Ada' },
-      { recipientRoleName: 'Desk' },
-      { assetId: 'a1' },
-      { serviceId: 's1' },
-    ]) {
+  it('treats only the fields that stand alone as sufficient on their own', () => {
+    for (const input of [{ subject: 'printer' }, { categoryName: 'HW' }]) {
       const params = new URLSearchParams(buildSearchQuery({ kind: 'ticket', ...input }));
-      expect(params.get('Subject'), JSON.stringify(input)).toBeNull();
+      expect(params.get('Subject'), JSON.stringify(input)).not.toBe(MATCH_ALL_SUBJECT);
     }
   });
 })
+
+describe('rejectIgnoredFilters', () => {
+  it('passes a search that only uses filters Matrix42 applies', () => {
+    expect(rejectIgnoredFilters({ kind: 'ticket', subject: 'printer' })).toBeNull();
+    expect(rejectIgnoredFilters({ kind: 'ticket', categoryName: 'HW', states: '200' })).toBeNull();
+  });
+
+  it('refuses a filter Matrix42 accepts but never applies', () => {
+    // Verified live: a nonsense initiator name returns every ticket rather than none.
+    const refusal = rejectIgnoredFilters({ kind: 'ticket', initiatorName: 'Ada' });
+    expect(refusal).toMatch(/initiator_name/);
+    expect(refusal).toMatch(/does not apply/);
+  });
+
+  it('names every ignored filter the caller passed', () => {
+    const refusal = rejectIgnoredFilters({ kind: 'ticket', initiatorName: 'Ada', assetId: 'a1' });
+    expect(refusal).toMatch(/initiator_name/);
+    expect(refusal).toMatch(/asset_id/);
+  });
+
+  it('points at the query that does work instead of just refusing', () => {
+    const refusal = rejectIgnoredFilters({ kind: 'ticket', ticketNumber: 'T1' }) ?? '';
+    expect(refusal).toMatch(/data_query/);
+    expect(refusal).toMatch(/SPSActivityClassBase/);
+  });
+
+  it('ignores a blank value rather than refusing on it', () => {
+    expect(rejectIgnoredFilters({ kind: 'ticket', subject: 'x', initiatorName: '   ' })).toBeNull();
+  });
+
+  it('lists exactly the three filters proven to narrow a result', () => {
+    expect([...HONOURED_FILTERS]).toEqual(['Subject', 'CategoryName', 'States']);
+  });
+});

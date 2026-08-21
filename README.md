@@ -154,16 +154,18 @@ and customisations are flagged using the custom prefix the instance itself repor
 | Action | Parameters | Returns |
 | --- | --- | --- |
 | `data_model` | – | How Matrix42's modules map onto a handful of base classes — where tickets, assets, licenses, contracts, SLAs and catalog items actually live. Read it when you are unsure where something is. |
-| `search_tickets` | `kind`, plus any of `ticket_number`, `subject`, `states`, `category_name`, `initiator_name`, `recipient_name`, `recipient_role_name`, `asset_id`, `service_id`, `only_mine`+`user_id` | Matching tickets. `kind` is one of `ticket`, `incident`, `problem`, `change`, `task`, `service_request`, `kb_article`. |
+| `search_tickets` | `kind`, plus `subject`, `category_name` and/or `states` | Matching tickets. `kind` is one of `ticket`, `incident`, `problem`, `change`, `task`, `service_request`, `kb_article`. Other filter parameters exist but Matrix42 ignores them, so passing one is refused. |
 | `get_ticket` | `ticket_object_id` | One ticket's summary as the service desk sees it. |
 | `sla_for_ticket` | `ticket_object_id` | The service level agreements that apply, as Matrix42 itself computes them. |
 | `sla_times` | `ticket_object_id` | Reaction and solution time state. |
 | `browse` | `domain`, `search?`, `where?`, `limit?` | Rows of one curated domain, plus the fields this instance does not have. |
 | `find` | `search`, `domains?`, `limit?` | Searches **every** domain at once for a name — for when you do not know where something lives. Domains that fail (module not installed) are reported, not fatal. |
 
-Ticket search filters by **name**, not id: `initiator_name: "Ada Lovelace"` and
-`category_name: "Hardware"` work directly, with no GUID lookup first. Every kind shares the same
-contract, so one call shape covers the whole service desk.
+Every kind shares the same contract, so one call shape covers the whole service desk. **Only
+`subject`, `category_name` and `states` actually filter it** — Matrix42 accepts
+`initiator_name`, `ticket_number`, `asset_id` and the rest, then ignores them and returns every
+ticket. Passing one is refused rather than handing back an unfiltered result you would read as
+filtered; the refusal points at `data_query` with an ASQL `where`, which does filter on those.
 
 `browse` domains: `assets`, `stock_units`, `contracts`, `slas`, `catalog_services`, `bookings`,
 `kb_articles`, `approvals`, `imports`, `import_runs`, `workflow_instances`, `workflow_definitions`,

@@ -40,7 +40,7 @@ export const serviceDeskTool: ToolDefinition = {
         description:
           "Read the service desk and the business objects around it. " +
           "action='data_model' explains how Matrix42's modules map onto a handful of base classes — read it first if you are unsure where something lives. " +
-          "action='search_tickets' searches ANY ticket kind (incident, problem, change, task, service request, generic ticket, knowledge article) through one uniform filter that accepts PERSON AND CATEGORY NAMES directly, so no id lookups are needed; set only_mine with a user's fragment id for \"my tickets\". " +
+          "action='search_tickets' searches ANY ticket kind (incident, problem, change, task, service request, generic ticket, knowledge article) through one uniform contract. Only subject, category_name and states actually filter — Matrix42 accepts the other parameters and ignores them, so they are refused rather than returning every ticket. To filter on a person, ticket number or asset, use data_query with an ASQL where clause. " +
           "action='get_ticket' returns one ticket's summary (it takes the OBJECT id — a fragment id answers null), action='sla_for_ticket' the service levels that apply to it, and action='sla_times' applies a service-level duration between two points in time. " +
           `action='browse' lists a curated domain: ${DOMAIN_SUMMARY}. ` +
           "action='find' searches ALL of those domains at once for a name — reach for it when you do not know where something lives. It does not cover tickets; search those with search_tickets. " +
@@ -63,18 +63,37 @@ export const serviceDeskTool: ToolDefinition = {
             .enum(KIND_NAMES)
             .optional()
             .describe("Ticket kind to search. Required for action='search_tickets'."),
-          ticket_number: z.string().optional().describe('Filter by ticket number.'),
+          ticket_number: z
+            .string()
+            .optional()
+            .describe(
+              'NOT APPLIED by Matrix42 — passing it is refused. Filter on TicketNumber with data_query instead.',
+            ),
           subject: z.string().optional().describe('Filter by subject text.'),
           states: z
             .string()
             .optional()
             .describe('Comma-separated state ids to include. Read valid ids with schema_discovery(get_pickup_values).'),
-          category_name: z.string().optional().describe('Filter by category NAME (no id needed).'),
-          initiator_name: z.string().optional().describe('Filter by the initiating person NAME.'),
-          recipient_name: z.string().optional().describe('Filter by the assigned person NAME.'),
-          recipient_role_name: z.string().optional().describe('Filter by the responsible role NAME.'),
-          asset_id: z.string().optional().describe('Filter by related asset id.'),
-          service_id: z.string().optional().describe('Filter by related service id.'),
+          category_name: z
+            .string()
+            .optional()
+            .describe('Filter by category NAME (no id needed). One of the three filters that works.'),
+          initiator_name: z
+            .string()
+            .optional()
+            .describe(
+              'NOT APPLIED by Matrix42 — passing it is refused. Filter on the initiator with data_query instead.',
+            ),
+          recipient_name: z
+            .string()
+            .optional()
+            .describe('NOT APPLIED by Matrix42 — passing it is refused.'),
+          recipient_role_name: z
+            .string()
+            .optional()
+            .describe('NOT APPLIED by Matrix42 — passing it is refused.'),
+          asset_id: z.string().optional().describe('NOT APPLIED by Matrix42 — passing it is refused.'),
+          service_id: z.string().optional().describe('NOT APPLIED by Matrix42 — passing it is refused.'),
           only_mine: z
             .boolean()
             .optional()

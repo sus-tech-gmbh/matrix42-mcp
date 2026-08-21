@@ -6,6 +6,26 @@ Notable changes to this project. Release notes are also generated automatically 
 This project follows [Semantic Versioning](https://semver.org). Until 1.0.0, minor versions may
 contain breaking changes to tool inputs; they will always be called out here.
 
+## 0.1.3 — 2026-08-21
+
+### Fixed
+
+- **`search_tickets` could return every ticket for a filtered request.** Matrix42’s Search
+  contract accepts `initiator_name`, `ticket_number`, `recipient_name`, `recipient_role_name`,
+  `asset_id` and `service_id` — and then ignores them. Verified against a live instance by
+  searching for a person who does not exist: the result was the full ticket list, not an empty
+  one. A caller had no way to tell, so "Ada’s open tickets" would confidently return everyone’s.
+
+  Only `subject`, `category_name` and `states` actually narrow the result. Those are the only
+  parameters now sent; passing one of the others is **refused**, with a message pointing at
+  `data_query` with an ASQL `where`, which does filter on them. Refusing is deliberate — silently
+  dropping the filter would still let a caller believe it had been applied.
+
+  Earlier releases advertised name-based ticket search as a headline feature. It never worked.
+
+- `states` is sent with a match-all subject, because Matrix42 rejects it as a search on its own
+  while still applying it as a filter.
+
 ## 0.1.2 — 2026-08-21
 
 ### Fixed

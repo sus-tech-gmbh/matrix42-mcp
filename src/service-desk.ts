@@ -58,38 +58,74 @@ function compact(input: Record<string, unknown>): Record<string, string> {
 export const MATCH_ALL_SUBJECT = '%';
 
 /**
- * The parameters Matrix42 counts as actual search criteria.
+ * The filters the Search contract actually APPLIES.
  *
- * OnlyRelatedToCurrentUser and CurrentUserId are deliberately absent: they narrow a search but do
- * not constitute one, so a request carrying only those still fails the "no criteria" check.
+ * Established by sending each one a value that matches nothing and comparing the row count with an
+ * unfiltered search: Subject, CategoryName and States narrow the result, while TicketNumber,
+ * InitiatorName, RecipientName, RecipientRoleName, AssetId and ServiceId return the full set
+ * unchanged. Matrix42 accepts those six and ignores them.
+ *
+ * That silence is the danger: a caller asking for one person's tickets would be handed everyone's
+ * and have no way to tell. Anything not listed here is refused rather than sent.
  */
-const CRITERIA_FIELDS = [
-  'TicketNumber',
-  'Subject',
-  'States',
-  'CategoryName',
-  'InitiatorName',
-  'RecipientName',
-  'RecipientRoleName',
-  'AttachmentName',
-  'AssetId',
-  'ServiceId',
-];
+export const HONOURED_FILTERS = ['Subject', 'CategoryName', 'States'] as const;
+
+/**
+ * The filters that constitute a search on their own.
+ *
+ * Search refuses to run without criteria, and States is not enough by itself — it answers 400
+ * "the advanced search criterias are not valid" — so it travels with a match-all subject.
+ *
+ * OnlyRelatedToCurrentUser and CurrentUserId narrow a search but never constitute one.
+ */
+const CRITERIA_FIELDS = ['Subject', 'CategoryName'];
+
+/** Filters Matrix42 declares but does not honour, with what to use instead. */
+const IGNORED_FILTERS: Record<string, string> = {
+  ticketNumber: 'ticket_number',
+  initiatorName: 'initiator_name',
+  recipientName: 'recipient_name',
+  recipientRoleName: 'recipient_role_name',
+  attachmentName: 'attachment_name',
+  assetId: 'asset_id',
+  serviceId: 'service_id',
+};
+
+/**
+ * Rejects a filter Matrix42 would silently drop.
+ *
+ * Returning unfiltered rows for a filtered request is worse than failing: the caller reports the
+ * wrong answer with full confidence. The message names the alternative that does work.
+ */
+export function rejectIgnoredFilters(input: TicketSearchInput): string | null {
+  const used = Object.entries(IGNORED_FILTERS)
+    .filter(([key]) => {
+      const value = (input as unknown as Record<string, unknown>)[key];
+      return typeof value === 'string' && value.trim() !== '';
+    })
+    .map(([, name]) => name);
+
+  if (used.length === 0) return null;
+  return (
+    `Matrix42's ticket Search accepts ${used.join(', ')} but does not apply ${used.length > 1 ? 'them' : 'it'} — ` +
+    'the request would return every ticket, which is worse than failing. Only subject, ' +
+    'category_name and states actually filter here.\n' +
+    'To filter on a person, a ticket number or a related asset, query the data instead: ' +
+    "data_query(action='query', class='SPSActivityClassBase', where=...). Read the attribute names " +
+    "with schema_discovery(action='describe_data_definition') first, and check " +
+    "data_query(action='list_views') — a saved view often already expresses it."
+  );
+}
 
 /** Maps the tool's snake_case input onto the contract's field names. */
 export function buildSearchQuery(input: TicketSearchInput): string {
   const query = new URLSearchParams(
     compact({
-      TicketNumber: input.ticketNumber,
+      // Only the filters Matrix42 honours are sent; the rest are refused above rather than
+      // quietly dropped, so a caller never believes a filter was applied when it was not.
       Subject: input.subject,
       States: input.states,
       CategoryName: input.categoryName,
-      InitiatorName: input.initiatorName,
-      RecipientName: input.recipientName,
-      RecipientRoleName: input.recipientRoleName,
-      AttachmentName: input.attachmentName,
-      AssetId: input.assetId,
-      ServiceId: input.serviceId,
       OnlyRelatedToCurrentUser: input.onlyRelatedToCurrentUser,
       CurrentUserId: input.currentUserId,
     }),
@@ -133,6 +169,9 @@ export async function searchTickets(
   client: M42Client,
   input: TicketSearchInput,
 ): Promise<TicketSearchResult> {
+  const refusal = rejectIgnoredFilters(input);
+  if (refusal) throw new Error(refusal);
+
   const route = TICKET_KINDS[input.kind];
   const query = buildSearchQuery(input);
   const raw = await client.getJson<unknown>(
