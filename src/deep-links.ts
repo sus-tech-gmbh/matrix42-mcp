@@ -1,99 +1,118 @@
 // src/deep-links.ts — builds links into the Matrix42 web interface. No network calls.
 //
-// Nothing here is invented. The shapes came from the instance's own URL-building operations
-// (CallTracker.GetIncidentListUrl and CallTracker.GetNewIncidentUrl), and the two open questions
-// were then settled directly:
+// This is the format Matrix42 documents for deep linking, and it was confirmed by opening the
+// generated links in a signed-in browser against a live instance:
 //
-//   Which of the two GUIDs is the object?  Passing a user's FRAGMENT id produced a URL carrying
-//   that user's OBJECT id; passing the object id produced an all-zero GUID.
+//     <origin>/wm/app-<Application>/?view-options={"objectId":…,"type":…,"viewType":"preview"}
 //
-//   Is the trailing GUID required?  No. The web app declares the route itself as
-//     name: "wmObjectDetailsPage", url: "/object-details/:_type/:_id/:widgetId?"
-//   and the "?" marks widgetId optional, so a two-segment link opens the default widget.
+// A ticket rendered its full detail page, and a person rendered theirs with the usual actions.
 //
-// :_type is the CONFIGURATION ITEM name (SPSUserType), not a data definition name.
+// An earlier attempt used the router's own /wm/object-details/<type>/<id> path. That path exists —
+// the app declares it — but opening it loads the application shell and leaves the content pane
+// EMPTY, so it is not the supported entry point. Do not go back to it.
+//
+// Two values matter and are easy to get wrong:
+//   type      the CONFIGURATION ITEM name (SPSActivityTypeTicket), never a data definition name.
+//   objectId  the OBJECT id ([Expression-ObjectID]), never a fragment id.
+
+/** How the object should be opened. */
+export type ViewType = 'preview' | 'edit' | 'new' | 'action';
 
 /** Removes a trailing slash so segments join cleanly. */
 function origin(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, '');
 }
 
-/**
- * A link to an object's detail page.
- *
- * Takes the CONFIGURATION ITEM name and the OBJECT id — the value of [Expression-ObjectID] — not a
- * data definition name and not a fragment id. The widget id is optional per the app's own route;
- * omitting it opens the default widget.
- */
-export function objectDetailsLink(
-  baseUrl: string,
-  typeName: string,
-  objectId: string,
-  widgetId?: string,
-): string {
-  const segments = ['wm', 'object-details', typeName, objectId];
-  if (widgetId) segments.push(widgetId);
-  return `${origin(baseUrl)}/${segments.map(encodeURIComponent).join('/')}`;
+/** Everything the view-options payload can carry. */
+export interface ViewOptions {
+  type: string;
+  viewType: ViewType;
+  objectId?: string;
+  /** Required when viewType is 'action'. */
+  actionId?: string;
+  /** Opens a specific dialog rather than the default one. */
+  dialogId?: string;
+  /** Shows only one page of the dialog. */
+  viewId?: string;
+  /** Hides the surrounding navigation, for embedding in another page. */
+  embedded?: boolean;
+  /** Pre-fills fields, keyed by data definition then attribute. */
+  presetParams?: Record<string, unknown>;
+  /** Opens the archived version of the object. */
+  archived?: 0 | 1;
+}
+
+/** Drops unset entries so the payload carries only what the caller meant. */
+function compact(options: ViewOptions): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(options).filter(([, value]) => value !== undefined));
 }
 
 /**
- * A link to the "create object" form, optionally pre-filled.
+ * Builds a deep link.
  *
- * presetParams is keyed by data definition, then by attribute — the shape Matrix42 itself emits,
- * e.g. { SPSActivityClassBase: { Initiator: "<user fragment id>" } }.
+ * The application segment selects which shell opens; ServiceDesk resolves tickets and people alike,
+ * so it is the default. The payload rides in the query string as JSON.
  */
-export function createObjectLink(
+export function viewOptionsLink(
   baseUrl: string,
   application: string,
-  typeName: string,
-  presetParams?: Record<string, unknown>,
+  options: ViewOptions,
 ): string {
-  const path = ['wm', `app-${application}`, 'notset', 'create-object', typeName]
-    .map(encodeURIComponent)
-    .join('/');
-  const url = `${origin(baseUrl)}/${path}`;
-  if (!presetParams || Object.keys(presetParams).length === 0) return url;
-  return `${url}?presetParams=${encodeURIComponent(JSON.stringify(presetParams))}`;
+  const path = ['wm', `app-${application}`].map(encodeURIComponent).join('/');
+  const payload = encodeURIComponent(JSON.stringify(compact(options)));
+  return `${origin(baseUrl)}/${path}/?view-options=${payload}`;
 }
-
-/** The kinds of link this module can build. */
-export type DeepLinkKind = 'object' | 'create';
 
 /** A built link, with the caveats a caller should pass on. */
 export interface DeepLink {
-  kind: DeepLinkKind;
+  viewType: ViewType;
   url: string;
   note: string;
 }
 
-/** Builds a link of the requested kind. */
+/** What each view type does, in the words a caller should repeat to a user. */
+const NOTES: Record<ViewType, string> = {
+  preview: 'Opens the object read-only in the web interface.',
+  edit: 'Opens the object in edit mode. Nothing changes until a person saves.',
+  new: 'Opens a creation form, pre-filled where asked. Nothing is created until a person submits it.',
+  action: 'Opens an action or wizard against the object. It runs only once a person completes it.',
+};
+
+/** Builds a link of the requested kind, refusing combinations Matrix42 will not honour. */
 export function buildDeepLink(input: {
-  kind: DeepLinkKind;
   baseUrl: string;
   typeName: string;
+  viewType?: ViewType;
   objectId?: string;
-  widgetId?: string;
-  application?: string;
+  actionId?: string;
+  dialogId?: string;
+  viewId?: string;
+  embedded?: boolean;
   presetParams?: Record<string, unknown>;
+  application?: string;
 }): DeepLink {
-  if (input.kind === 'object') {
-    if (!input.objectId) throw new Error("An object link needs 'object_id'.");
-    return {
-      kind: 'object',
-      url: objectDetailsLink(input.baseUrl, input.typeName, input.objectId, input.widgetId),
-      note:
-        'Opens the object in the web interface. Takes the configuration item name and the OBJECT id ' +
-        '([Expression-ObjectID]) — a data definition name or a fragment id resolves to nothing.',
-    };
+  const viewType = input.viewType ?? 'preview';
+
+  if (viewType !== 'new' && !input.objectId) {
+    throw new Error(`A '${viewType}' link needs 'object_id' — only 'new' opens without one.`);
   }
+  if (viewType === 'action' && !input.actionId) {
+    throw new Error("An 'action' link needs 'action_id'.");
+  }
+
+  const options: ViewOptions = { type: input.typeName, viewType };
+  if (input.objectId) options.objectId = input.objectId;
+  if (input.actionId) options.actionId = input.actionId;
+  if (input.dialogId) options.dialogId = input.dialogId;
+  if (input.viewId) options.viewId = input.viewId;
+  if (input.embedded !== undefined) options.embedded = input.embedded;
+  if (input.presetParams && Object.keys(input.presetParams).length > 0) {
+    options.presetParams = input.presetParams;
+  }
+
   return {
-    kind: 'create',
-    url: createObjectLink(
-      input.baseUrl,
-      input.application ?? 'ServiceDesk',
-      input.typeName,
-      input.presetParams,
-    ),
-    note: 'Opens a pre-filled creation form. Nothing is created until a person submits it.',
+    viewType,
+    url: viewOptionsLink(input.baseUrl, input.application ?? 'ServiceDesk', options),
+    note: NOTES[viewType],
   };
 }

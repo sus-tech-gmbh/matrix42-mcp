@@ -26,7 +26,8 @@ contain breaking changes to tool inputs; they will always be called out here.
   id and resolves the configuration item itself, since a base definition is reused by many of them.
   A fragment id is refused rather than turned into a link that opens nothing. Links target the web
   interface's own origin, read from the instance's web shell config, because that is frequently not
-  the host the API is reached on; `M42_UI_URL` overrides it.
+  the host the API is reached on; `M42_UI_URL` overrides it. Supports preview, edit, create and
+  action links, verified by opening generated URLs in a signed-in browser.
 - **Schema-driven column resolution.** Projections are resolved against the live schema before every
   query, so a field a module does not install is reported rather than sent.
 

@@ -105,18 +105,22 @@ export const dataQueryTool: ToolDefinition = {
             .describe(
               "For action='deep_link': resolve the object's real configuration item first, so a dead link is reported rather than handed over. Defaults to true; set false only to build a link for an id this instance cannot resolve.",
             ),
-          link_kind: z
-            .enum(['object', 'create'])
+          view_type: z
+            .enum(['preview', 'edit', 'new', 'action'])
             .optional()
             .describe(
-              "For action='deep_link': 'object' opens an existing record (default), 'create' opens a pre-filled creation form.",
+              "For action='deep_link': how to open the object. 'preview' (default) is read-only, 'edit' opens the form, 'new' a creation form, 'action' a wizard. Only 'new' works without an object_id.",
             ),
-          widget_id: z
+          action_id: z.string().optional().describe("Action or wizard to run, for view_type='action'."),
+          dialog_id: z.string().optional().describe('Open a specific dialog instead of the default one.'),
+          embedded: z
+            .boolean()
+            .optional()
+            .describe('Hide the surrounding navigation, for embedding the page elsewhere.'),
+          link_view_id: z
             .string()
             .optional()
-            .describe(
-              "Optional widget to open the object in, for action='deep_link'. The web app declares this segment optional, so omitting it opens the default widget.",
-            ),
+            .describe("Show only one page of the dialog, for action='deep_link'."),
           application: z
             .string()
             .optional()
@@ -160,8 +164,11 @@ export const dataQueryTool: ToolDefinition = {
         ci_name,
         object_id,
         verify,
-        link_kind,
-        widget_id,
+        view_type,
+        action_id,
+        dialog_id,
+        embedded,
+        link_view_id,
         application,
         preset_params,
       }) => {
@@ -244,7 +251,7 @@ export const dataQueryTool: ToolDefinition = {
               let typeName = ci_name;
               let resolvedFrom: string | undefined;
 
-              if (object_id && verify !== false) {
+              if (object_id && verify !== false && view_type !== 'new') {
                 const actual = await resolveObjectType(client, object_id);
                 if (actual === null) {
                   return errorResult(
@@ -262,7 +269,7 @@ export const dataQueryTool: ToolDefinition = {
               if (!typeName) {
                 return errorResult(
                   "deep_link needs 'object_id' so the configuration item can be resolved, or an " +
-                    "explicit 'ci_name' (e.g. SPSActivityTypeIncident) for a creation link.",
+                    "explicit 'ci_name' (e.g. SPSActivityTypeIncident) when opening a creation form.",
                 );
               }
 
@@ -273,11 +280,14 @@ export const dataQueryTool: ToolDefinition = {
 
               try {
                 const link = buildDeepLink({
-                  kind: link_kind ?? 'object',
                   baseUrl: ui.origin,
                   typeName,
+                  viewType: view_type,
                   objectId: object_id,
-                  widgetId: widget_id,
+                  actionId: action_id,
+                  dialogId: dialog_id,
+                  viewId: link_view_id,
+                  embedded,
                   application,
                   presetParams: preset_params,
                 });
