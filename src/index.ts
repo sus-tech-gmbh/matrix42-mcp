@@ -5,6 +5,8 @@ import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import { ConfigError, describeConfig, loadConfig } from './config.js';
 import { M42Client } from './m42-client.js';
+import { registerPrompts } from './prompts.js';
+import { registerResources } from './resources.js';
 import { ALL_TOOLS, registerTools, selectTools } from './tools/index.js';
 
 const SERVER_NAME = 'matrix42-mcp';
@@ -34,15 +36,28 @@ Use the data_query tool to read actual records:
   - action='validate_asql' to check a filter before running it — cheaper than a failed query.
   - action='query' to read rows of a data definition, with paging and typed columns.
   - action='get_fragment' / 'get_object' to fetch one record in full.
+Use the service_desk tool for the service desk and the objects around it:
+  - action='data_model' explains how Matrix42's modules map onto a few base classes — read it when
+    you are unsure where something lives (a license is an asset, an SLA is a contract).
+  - action='search_tickets' searches any ticket kind by person or category NAME, no ids needed.
+  - action='browse' lists assets, contracts, catalog services, bookings, knowledge articles,
+    approvals, imports and workflow instances.
 Use server_info to see which instance is connected.
 
-Prefer discovering the schema before querying: find the class, check the attributes, and read pickup
-values rather than guessing numeric codes. Saved views (data_query action='list_views') often already
+The same guides are published as resources (matrix42://guide/data-model, /schema, /asql, /api)
+if you would rather read them without a tool call. Prompt templates cover the common workflows —
+explore_instance, build_query, triage_ticket, safe_change and find_endpoint.
+
+Never guess attribute names or pickup values. Read the definition with
+schema_discovery(describe_data_definition) and the values with schema_discovery(get_pickup_values)
+before you query or write. Attribute sets differ per instance, so a name that exists on one system
+may not exist here. Saved views (data_query action='list_views') often already
 express what you want and are more reliable than hand-written filters.
 
 Tools that modify data are only present when the operator enabled writes. When they are, treat
 notification flags and portal visibility as consequential: they reach real people, and they stay off
-unless you set them deliberately.`;
+unless you set them deliberately. A ticket you create is marked with an internal note saying it was
+raised through this server, so the human who picks it up can see where it came from.`;
 
 /** stdout belongs to the MCP protocol — every diagnostic goes to stderr. */
 function log(message: string): void {
@@ -66,6 +81,8 @@ Configuration (environment variables):
   M42_LANGUAGE             response language, default en-US (sent as Explicit-Language)
   M42_TOOLS                comma-separated tool ids to expose (default: all)
   M42_ALLOW_WRITES         set to 1 to expose tools that modify data (default: read-only)
+  M42_AUDIT_NOTE           set to 0 to stop marking created tickets as API-raised (default: on)
+  M42_AGENT_LABEL          how the assistant is named in that note (default: Matrix42 MCP server)
   M42_ALLOW_INSECURE_TLS   set to 1 to skip TLS verification (self-signed dev instances only)
   M42_TIMEOUT_MS           per-request timeout, default 30000
 
@@ -109,9 +126,11 @@ function main(): void {
   const handle = serveStdio(() => {
     const server = new McpServer(
       { name: SERVER_NAME, version: SERVER_VERSION },
-      { capabilities: { tools: {} }, instructions: INSTRUCTIONS },
+      { capabilities: { tools: {}, resources: {}, prompts: {} }, instructions: INSTRUCTIONS },
     );
     registerTools(server, { client, config }, tools);
+    registerResources(server);
+    registerPrompts(server);
     return server;
   });
 

@@ -8,32 +8,228 @@ import {
   classifyTicket,
   closeTickets,
   createTicket,
+  planAddJournalEntry,
+  planCloseTickets,
+  planCreateTicket,
 } from '../tickets.js';
+import { previewPlan, type WritePlan } from '../write-plan.js';
+import {
+  WORK_ACTIVITY_TYPES,
+  planForward,
+  planPause,
+  planReopen,
+  planReturnToRole,
+  planSetDeadline,
+  planTakeOverOrAccept,
+  planTrackWorkingTime,
+  forwardTickets,
+  pauseTickets,
+  reopenTickets,
+  returnToRole,
+  setDeadline,
+  takeOverOrAccept,
+  trackWorkingTime,
+  type WorkActivityType,
+} from '../ticket-verbs.js';
 import { type ToolContext, type ToolDefinition, textResult, errorResult } from './types.js';
 
 /**
  * The only tool that changes Matrix42 data. Registered exclusively when writes are enabled, so a
  * default deployment cannot modify anything even if a model asks it to.
  */
+/** Arguments the planner reads. Kept loose so it can run before the switch narrows the action. */
+interface PlannableArgs {
+  action: string;
+  activity_type?: number;
+  subject?: string;
+  description?: string;
+  description_html?: string;
+  initiator?: string;
+  category?: string;
+  service?: string;
+  priority?: number;
+  impact?: number;
+  urgency?: number;
+  state?: number;
+  object_ids?: string[];
+  object_id?: string;
+  comments?: string;
+  reason?: number;
+  notify_initiator?: boolean;
+  notify_users?: boolean;
+  notify_responsible?: boolean;
+  close_related_incidents?: boolean;
+  visible_in_portal?: boolean;
+  entry_type?: number;
+  parameters?: { name: string; value: unknown; format?: string }[];
+  file_ids?: string[];
+  type_name?: string;
+  role_id?: string;
+  user_id?: string;
+  ola_id?: string;
+  reminder_date?: string;
+  not_escalate_while_paused?: boolean;
+  reason_text?: string;
+  deadline?: string;
+  minutes?: number;
+  work_activity_type?: WorkActivityType;
+  begin?: string;
+  end?: string;
+  extra_fields?: Record<string, unknown>;
+}
+
+/**
+ * Builds the plan an action would execute, or null when required arguments are missing.
+ *
+ * This calls the same plan builders the execute path calls, so a preview is the request — not a
+ * description of it that could fall out of step.
+ */
+function planFor(args: PlannableArgs): WritePlan | null {
+  switch (args.action) {
+    case 'create_ticket':
+      if (args.activity_type === undefined || !args.subject) return null;
+      return planCreateTicket({
+        activityType: args.activity_type,
+        subject: args.subject,
+        description: args.description,
+        descriptionHtml: args.description_html,
+        initiator: args.initiator,
+        category: args.category,
+        service: args.service,
+        priority: args.priority,
+        impact: args.impact,
+        urgency: args.urgency,
+        state: args.state,
+        extraFields: args.extra_fields,
+      });
+
+    case 'close_ticket':
+      if (!args.object_ids?.length) return null;
+      return planCloseTickets({
+        objectIds: args.object_ids,
+        comments: args.comments,
+        reason: args.reason,
+        notifyInitiator: args.notify_initiator,
+        notifyUsers: args.notify_users,
+        notifyResponsible: args.notify_responsible,
+        closeRelatedIncidents: args.close_related_incidents,
+        extraFields: args.extra_fields,
+      });
+
+    case 'add_journal_entry':
+      if (!args.object_id || !args.comments) return null;
+      return planAddJournalEntry({
+        objectId: args.object_id,
+        comments: args.comments,
+        visibleInPortal: args.visible_in_portal,
+        entryType: args.entry_type,
+        parameters: args.parameters,
+        fileIds: args.file_ids,
+      });
+
+    case 'take_over':
+    case 'accept':
+      if (!args.object_ids?.length || !args.type_name) return null;
+      return planTakeOverOrAccept(
+        args.action === 'take_over' ? 'TakeOver' : 'Accept',
+        args.object_ids,
+        args.type_name,
+      );
+
+    case 'forward': {
+      if (!args.object_ids?.length || !args.type_name) return null;
+      if (!args.role_id && !args.user_id) return null;
+      const typeName = args.type_name;
+      return planForward({
+        tickets: args.object_ids.map((objectId) => ({ typeName, objectId })),
+        roleId: args.role_id,
+        userId: args.user_id,
+        olaId: args.ola_id,
+        comments: args.comments,
+      });
+    }
+
+    case 'pause':
+      if (!args.object_ids?.length || !args.reminder_date) return null;
+      return planPause({
+        objectIds: args.object_ids,
+        reminderDate: args.reminder_date,
+        comments: args.comments,
+        reason: args.reason,
+        notEscalateWhilePaused: args.not_escalate_while_paused,
+      });
+
+    case 'reopen':
+      if (!args.object_ids?.length) return null;
+      return planReopen(args.object_ids, args.reason_text);
+
+    case 'return_to_role':
+      if (!args.object_id) return null;
+      return planReturnToRole(args.object_id, args.comments);
+
+    case 'set_deadline':
+      if (!args.object_ids?.length || !args.deadline) return null;
+      return planSetDeadline(args.object_ids, args.deadline);
+
+    case 'track_working_time':
+      if (
+        !args.object_ids?.length ||
+        args.minutes === undefined ||
+        !args.work_activity_type ||
+        !args.begin ||
+        !args.end
+      ) {
+        return null;
+      }
+      return planTrackWorkingTime({
+        objectIds: args.object_ids,
+        minutes: args.minutes,
+        description: args.description,
+        activityType: args.work_activity_type,
+        begin: args.begin,
+        end: args.end,
+      });
+
+    default:
+      return null;
+  }
+}
+
 export const ticketActionsTool: ToolDefinition = {
   id: 'ticket_actions',
-  summary: 'Create and close tickets, classify text, and add journal entries (requires writes).',
+  summary: 'Run the ticket lifecycle: create, close, take over, forward, pause, reopen (requires writes).',
 
-  register(server: McpServer, { client }: ToolContext): void {
+  register(server: McpServer, { client, config }: ToolContext): void {
     server.registerTool(
       'ticket_actions',
       {
         title: 'Matrix42 ticket actions',
         description:
-          "MODIFIES Matrix42 data. action='create_ticket' creates a ticket, incident or service request and returns its OBJECT id, which close_ticket and add_journal_entry take directly. " +
+          "MODIFIES Matrix42 data. Every action here previews first: called WITHOUT confirm:true it returns the exact request it would send and changes nothing, so show that preview to the user and only then call again with confirm:true. " +
+          "action='create_ticket' creates a ticket, incident or service request and returns its OBJECT id, which close_ticket and add_journal_entry take directly. " +
           "action='close_ticket' closes one or more tickets by OBJECT id (the [Expression-ObjectID] value, not the fragment id) with an optional solution text and closing reason. " +
           "action='add_journal_entry' adds a comment to any object; it is INTERNAL unless visible_in_portal is set, which publishes it to the requester's self-service portal. " +
           "action='classify_ticket' only calculates a suggested ticket type from a subject and description and changes nothing. " +
-          'Notification e-mails are never sent unless you explicitly ask for them. Resolve pickup values with schema_discovery(get_pickup_values) and user or category ids with data_query before calling.',
+          'A created ticket also gets an internal journal note recording that it was raised through this server, since creating through the API otherwise leaves no trace of where the ticket came from; pass audit_note:false to skip it. ' + +
+"The lifecycle verbs work on OBJECT ids: take_over and accept claim tickets, forward hands them to a role or user, pause holds one (optionally stopping the escalation clock), reopen reverses a close, return_to_role gives it back, set_deadline sets the handling date, and track_working_time books effort. " +
+          'Notification e-mails are never sent unless you explicitly ask for them. Resolve pickup values with schema_discovery(get_pickup_values) and user, role or category ids with service_desk or data_query before calling.',
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
         inputSchema: z.object({
           action: z
-            .enum(['create_ticket', 'close_ticket', 'add_journal_entry', 'classify_ticket'])
+            .enum([
+              'create_ticket',
+              'close_ticket',
+              'add_journal_entry',
+              'classify_ticket',
+              'take_over',
+              'accept',
+              'forward',
+              'pause',
+              'reopen',
+              'return_to_role',
+              'set_deadline',
+              'track_working_time',
+            ])
             .describe('Which operation to perform.'),
 
           activity_type: z
@@ -126,6 +322,67 @@ export const ticketActionsTool: ToolDefinition = {
             ),
           file_ids: z.array(z.string()).optional().describe('File ids to attach to the entry.'),
 
+          type_name: z
+            .string()
+            .optional()
+            .describe(
+              "Configuration item name of the tickets, e.g. 'SPSActivityTypeIncident'. Required by take_over and accept; a row's usedInConfigurationItems reports it.",
+            ),
+          role_id: z
+            .string()
+            .optional()
+            .describe(
+              'Target role id, for forward. It must be the SPSScRoleClassBase fragment id — the same role has a different id on SPSSecurityClassRole, and passing that one fails on a foreign key. Read it with data_query on SPSScRoleClassBase, pivoting for the name via T(SPSSecurityClassRole).Name.',
+            ),
+          user_id: z.string().optional().describe('Target user fragment id, for forward.'),
+          ola_id: z.string().optional().describe('OLA id to apply when forwarding.'),
+          reminder_date: z
+            .string()
+            .optional()
+            .describe(
+              'ISO date to be reminded. REQUIRED by pause: Matrix42 rejects a reminder date that is not in the future.',
+            ),
+          not_escalate_while_paused: z
+            .boolean()
+            .optional()
+            .describe('Hold the escalation clock while paused. Defaults to false.'),
+          reason_text: z.string().optional().describe('Free-text reason, for reopen.'),
+          deadline: z.string().optional().describe('ISO date the ticket must be handled by, for set_deadline.'),
+          minutes: z
+            .number()
+            .int()
+            .optional()
+            .describe('Minutes of work to book. REQUIRED by track_working_time.'),
+          work_activity_type: z
+            .enum(Object.keys(WORK_ACTIVITY_TYPES) as [WorkActivityType, ...WorkActivityType[]])
+            .optional()
+            .describe('What kind of work the tracked time was. REQUIRED by track_working_time.'),
+          begin: z
+            .string()
+            .optional()
+            .describe('ISO start of the tracked period. REQUIRED by track_working_time.'),
+          end: z
+            .string()
+            .optional()
+            .describe(
+              'ISO end of the tracked period. REQUIRED by track_working_time, and must be after begin.',
+            ),
+          confirm: z
+            .boolean()
+            .optional()
+            .describe(
+              'Apply the change. Without it the call only previews the request and nothing is modified. Never set this on the user\'s behalf — show them the preview and let them decide.',
+            ),
+          dry_run: z
+            .boolean()
+            .optional()
+            .describe('Force a preview even when confirm is set. Useful to re-check a payload.'),
+          audit_note: z
+            .boolean()
+            .optional()
+            .describe(
+              'Write the internal "raised through the API" note on a created ticket. Defaults to the server setting (on unless M42_AUDIT_NOTE=0). Never portal-visible.',
+            ),
           extra_fields: z
             .record(z.string(), z.unknown())
             .optional()
@@ -136,6 +393,21 @@ export const ticketActionsTool: ToolDefinition = {
       },
       async (args) => {
         try {
+          // classify_ticket only calculates a suggestion, so it is exempt from the confirm gate.
+          const isWrite = args.action !== 'classify_ticket';
+          const applying = args.confirm === true && args.dry_run !== true;
+
+          if (isWrite && !applying) {
+            const plan = planFor(args);
+            if (!plan) {
+              return errorResult(
+                `Cannot preview '${args.action}': required arguments are missing. ` +
+                  'Supply them and call again.',
+              );
+            }
+            return textResult(JSON.stringify(previewPlan(plan), null, 2));
+          }
+
           switch (args.action) {
             case 'create_ticket': {
               if (args.activity_type === undefined || !args.subject) {
@@ -154,7 +426,7 @@ export const ticketActionsTool: ToolDefinition = {
                 urgency: args.urgency,
                 state: args.state,
                 extraFields: args.extra_fields,
-              });
+              }, { enabled: args.audit_note ?? config.auditNote, label: config.agentLabel });
               return textResult(JSON.stringify(result));
             }
 
@@ -190,6 +462,116 @@ export const ticketActionsTool: ToolDefinition = {
                 fileIds: args.file_ids,
               });
               return textResult(JSON.stringify(result));
+            }
+
+            case 'take_over':
+            case 'accept': {
+              if (!args.object_ids?.length || !args.type_name) {
+                return errorResult(
+                  `${args.action} needs 'object_ids' and 'type_name' (the configuration item of those tickets).`,
+                );
+              }
+              const verb = args.action === 'take_over' ? 'TakeOver' : 'Accept';
+              return textResult(
+                JSON.stringify(await takeOverOrAccept(client, verb, args.object_ids, args.type_name)),
+              );
+            }
+
+            case 'forward': {
+              if (!args.object_ids?.length || !args.type_name) {
+                return errorResult("forward needs 'object_ids' and 'type_name'.");
+              }
+              if (!args.role_id && !args.user_id) {
+                return errorResult("forward needs a target: 'role_id' or 'user_id'.");
+              }
+              const tickets = args.object_ids.map((objectId) => ({
+                typeName: args.type_name as string,
+                objectId,
+              }));
+              return textResult(
+                JSON.stringify(
+                  await forwardTickets(client, {
+                    tickets,
+                    roleId: args.role_id,
+                    userId: args.user_id,
+                    olaId: args.ola_id,
+                    comments: args.comments,
+                  }),
+                ),
+              );
+            }
+
+            case 'pause': {
+              if (!args.object_ids?.length || !args.reminder_date) {
+                return errorResult(
+                  "pause needs 'object_ids' and 'reminder_date'. Matrix42 rejects a pause whose " +
+                    'reminder date is not in the future, so it cannot be left out.',
+                );
+              }
+              return textResult(
+                JSON.stringify(
+                  await pauseTickets(client, {
+                    objectIds: args.object_ids,
+                    reminderDate: args.reminder_date,
+                    comments: args.comments,
+                    reason: args.reason,
+                    notEscalateWhilePaused: args.not_escalate_while_paused,
+                  }),
+                ),
+              );
+            }
+
+            case 'reopen': {
+              if (!args.object_ids?.length) return errorResult("reopen needs 'object_ids'.");
+              return textResult(
+                JSON.stringify(await reopenTickets(client, args.object_ids, args.reason_text)),
+              );
+            }
+
+            case 'return_to_role': {
+              if (!args.object_id) {
+                return errorResult("return_to_role needs 'object_id' (a single ticket).");
+              }
+              return textResult(
+                JSON.stringify(await returnToRole(client, args.object_id, args.comments)),
+              );
+            }
+
+            case 'set_deadline': {
+              if (!args.object_ids?.length || !args.deadline) {
+                return errorResult("set_deadline needs 'object_ids' and 'deadline'.");
+              }
+              return textResult(
+                JSON.stringify(await setDeadline(client, args.object_ids, args.deadline)),
+              );
+            }
+
+            case 'track_working_time': {
+              if (
+                !args.object_ids?.length ||
+                args.minutes === undefined ||
+                !args.work_activity_type ||
+                !args.begin ||
+                !args.end
+              ) {
+                return errorResult(
+                  "track_working_time needs 'object_ids', 'minutes', 'work_activity_type', 'begin' " +
+                    "and 'end' — the contract marks all four of those mandatory, and 'end' must be " +
+                    "after 'begin'.",
+                );
+              }
+              return textResult(
+                JSON.stringify(
+                  await trackWorkingTime(client, {
+                    objectIds: args.object_ids,
+                    minutes: args.minutes,
+                    description: args.description,
+                    activityType: args.work_activity_type,
+                    begin: args.begin,
+                    end: args.end,
+                  }),
+                ),
+              );
             }
 
             case 'classify_ticket': {

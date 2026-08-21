@@ -5,6 +5,7 @@
 
 import type { M42Client } from './m42-client.js';
 import { M42Error } from './m42-client.js';
+import { compact, executePlan, type WritePlan } from './write-plan.js';
 
 /**
  * Activity type ids that Ticket.Create rejects, with the name Matrix42 reports for each.
@@ -23,7 +24,11 @@ export const REJECTED_ACTIVITY_TYPES: Record<number, string> = {
 
 /**
  * Activity type ids observed to be accepted by Ticket.Create. Verify per instance.
- * Confirmed by creating one: id 6 produces a Ticket (number prefix TCK).
+ *
+ * Confirmed by creating one: id 6 yields a ticket numbered TCK…, but the instance reports its
+ * configuration item as SPSActivityTypeServiceRequest — the number prefix and the configuration
+ * item do not have to agree. Read TypeName back from the record rather than inferring it, since
+ * take_over and forward need the real one.
  */
 export const KNOWN_ACCEPTED_ACTIVITY_TYPES = [0, 5, 6] as const;
 
@@ -32,6 +37,39 @@ export interface JournalParameter {
   name: string;
   value: unknown;
   format?: string;
+}
+
+/**
+ * Whether and how a newly created ticket is marked as API-raised.
+ *
+ * Creating through the API leaves none of the trace the web interface leaves, so a human opening
+ * the ticket cannot tell where it came from. The note closes that gap.
+ */
+export interface AuditNoteOptions {
+  enabled: boolean;
+  /** How the assistant is identified. */
+  label: string;
+}
+
+/** Outcome of the audit note, which never affects whether the ticket itself was created. */
+export interface AuditNoteResult {
+  added: boolean;
+  journalId?: string;
+  /** Why it could not be written, when it could not. */
+  error?: string;
+}
+
+/**
+ * The note's text.
+ *
+ * Deliberately factual: it records the channel, not a claim about who the requester is. It must
+ * never read as though a named person wrote it.
+ */
+export function buildAuditNote(label: string): string {
+  return (
+    `Raised through the Matrix42 API by ${label}, not through the web interface. ` +
+    'This note is an automatic record of the channel; it is internal and not shown in the portal.'
+  );
 }
 
 /** Fields accepted when creating a ticket. */
@@ -93,22 +131,92 @@ export interface JournalEntryInput {
   fileIds?: string[];
 }
 
-/** Removes undefined entries so Matrix42 receives only fields the caller actually set. */
-function compact(body: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(Object.entries(body).filter(([, value]) => value !== undefined));
+/** Plans creating a ticket. The activity-type guard lives here so a preview rejects it too. */
+export function planCreateTicket(input: CreateTicketInput): WritePlan {
+  const rejected = REJECTED_ACTIVITY_TYPES[input.activityType];
+  if (rejected) {
+    throw new M42Error(
+      `Ticket.Create does not handle activity type ${input.activityType} (${rejected}). ` +
+        `It creates tickets, incidents and service requests; ${rejected} has its own service.`,
+    );
+  }
+  return {
+    method: 'POST',
+    path: `m42Services/api/ticket/Create?activityType=${input.activityType}`,
+    body: compact({
+      Subject: input.subject,
+      Description: input.description,
+      DescriptionHTML: input.descriptionHtml,
+      User: input.initiator,
+      Category: input.category,
+      Priority: input.priority,
+      Impact: input.impact,
+      Urgency: input.urgency,
+      State: input.state,
+      Service: input.service,
+      ...(input.extraFields ?? {}),
+    }),
+    summary: `Create a ticket of activity type ${input.activityType}: "${input.subject}"`,
+    effects: ['Creates a real record that enters the service desk queue and may trigger workflows.'],
+  };
 }
 
-/** Sends a write request and fails loudly on a non-2xx response. */
-async function post(
-  client: M42Client,
-  path: string,
-  body: Record<string, unknown>,
-): Promise<string> {
-  const { status, body: text } = await client.request('POST', path, JSON.stringify(body));
-  if (status < 200 || status >= 300) {
-    throw new M42Error(`Matrix42 returned HTTP ${status} for /${path}: ${text.slice(0, 400)}`, status);
+/** Plans closing tickets, naming every consequence the caller opted into. */
+export function planCloseTickets(input: CloseTicketInput): WritePlan {
+  const effects: string[] = [];
+  if (input.notifyInitiator) effects.push('Sends a closure e-mail to the initiator — a real person.');
+  if (input.notifyUsers) effects.push('Sends a closure e-mail to the attached users — real people.');
+  if (input.notifyResponsible) effects.push('Notifies the responsible agent.');
+  if (input.closeRelatedIncidents) {
+    effects.push('Also closes related incidents, cascading to other tickets.');
   }
-  return text;
+  if (effects.length === 0) effects.push('No notifications are sent and nothing cascades.');
+
+  return {
+    method: 'POST',
+    path: 'm42Services/api/ticket/Close',
+    body: compact({
+      ObjectIds: input.objectIds,
+      Comments: input.comments,
+      Reason: input.reason,
+      SendMailToInitiator: input.notifyInitiator ?? false,
+      SendMailToUsers: input.notifyUsers ?? false,
+      NotifyResponsible: input.notifyResponsible ?? false,
+      CloseRelatedIncidents: input.closeRelatedIncidents ?? false,
+      SkipFailIfAlreadyClosed: input.skipFailIfAlreadyClosed ?? true,
+      ...(input.extraFields ?? {}),
+    }),
+    summary: `Close ${input.objectIds.length} ticket(s)`,
+    effects,
+  };
+}
+
+/** Plans a journal entry, calling out portal visibility because it reaches the requester. */
+export function planAddJournalEntry(input: JournalEntryInput): WritePlan {
+  const visibleInPortal = input.visibleInPortal ?? false;
+  return {
+    method: 'POST',
+    path: 'm42Services/api/journal/Add',
+    body: compact({
+      ObjectId: input.objectId,
+      Comments: input.comments,
+      VisibleInPortal: visibleInPortal,
+      Publish: visibleInPortal,
+      EntryType: input.entryType ?? 0,
+      FileIds: input.fileIds,
+      Parameters: input.parameters?.map((parameter) =>
+        compact({ Name: parameter.name, Value: parameter.value, Format: parameter.format }),
+      ),
+    }),
+    summary: visibleInPortal
+      ? 'Add a journal entry and PUBLISH it to the self-service portal'
+      : 'Add an internal journal entry',
+    effects: [
+      visibleInPortal
+        ? 'The requester will see this text in their self-service portal.'
+        : 'Internal only — the requester does not see this.',
+    ],
+  };
 }
 
 /**
@@ -121,34 +229,35 @@ async function post(
 export async function createTicket(
   client: M42Client,
   input: CreateTicketInput,
-): Promise<{ created: true; activityType: number; objectId: string }> {
-  const info = compact({
-    Subject: input.subject,
-    Description: input.description,
-    DescriptionHTML: input.descriptionHtml,
-    User: input.initiator,
-    Category: input.category,
-    Priority: input.priority,
-    Impact: input.impact,
-    Urgency: input.urgency,
-    State: input.state,
-    Service: input.service,
-    ...(input.extraFields ?? {}),
-  });
-  const rejected = REJECTED_ACTIVITY_TYPES[input.activityType];
-  if (rejected) {
-    throw new M42Error(
-      `Ticket.Create does not handle activity type ${input.activityType} (${rejected}). ` +
-        `It creates tickets, incidents and service requests; ${rejected} has its own service.`,
-    );
-  }
-  const text = await post(
-    client,
-    `m42Services/api/ticket/Create?activityType=${input.activityType}`,
-    info,
-  );
+  auditNote?: AuditNoteOptions,
+): Promise<{
+  created: true;
+  activityType: number;
+  objectId: string;
+  auditNote?: AuditNoteResult;
+}> {
+  const text = await executePlan(client, planCreateTicket(input));
   const objectId = text.trim().replace(/^"|"$/g, '');
-  return { created: true, activityType: input.activityType, objectId };
+  const created = { created: true, activityType: input.activityType, objectId } as const;
+
+  if (!auditNote?.enabled) return created;
+  // The ticket already exists. A failed note is reported, never raised: losing the audit trail is
+  // worth far less than a caller believing the create failed and retrying it.
+  try {
+    const entry = await addJournalEntry(client, {
+      objectId,
+      comments: buildAuditNote(auditNote.label),
+      visibleInPortal: false,
+    });
+    const note: AuditNoteResult = { added: true };
+    if (entry.journalId) note.journalId = entry.journalId;
+    return { ...created, auditNote: note };
+  } catch (error) {
+    return {
+      ...created,
+      auditNote: { added: false, error: error instanceof Error ? error.message : String(error) },
+    };
+  }
 }
 
 /** Closes one or more tickets. Notification e-mails are sent only when explicitly requested. */
@@ -159,18 +268,7 @@ export async function closeTickets(
   const notificationsSent = Boolean(
     input.notifyInitiator || input.notifyUsers || input.notifyResponsible,
   );
-  const body = compact({
-    ObjectIds: input.objectIds,
-    Comments: input.comments,
-    Reason: input.reason,
-    SendMailToInitiator: input.notifyInitiator ?? false,
-    SendMailToUsers: input.notifyUsers ?? false,
-    NotifyResponsible: input.notifyResponsible ?? false,
-    CloseRelatedIncidents: input.closeRelatedIncidents ?? false,
-    SkipFailIfAlreadyClosed: input.skipFailIfAlreadyClosed ?? true,
-    ...(input.extraFields ?? {}),
-  });
-  await post(client, 'm42Services/api/ticket/Close', body);
+  await executePlan(client, planCloseTickets(input));
   return { closed: true, objectIds: input.objectIds, notificationsSent };
 }
 
@@ -180,9 +278,12 @@ export async function classifyTicket(
   subject: string,
   description?: string,
 ): Promise<unknown> {
-  const text = await post(client, 'm42Services/api/ticket/Classify', {
-    TicketSubject: subject,
-    TicketDescription: description ?? '',
+  const text = await executePlan(client, {
+    method: 'POST',
+    path: 'm42Services/api/ticket/Classify',
+    body: { TicketSubject: subject, TicketDescription: description ?? '' },
+    summary: 'Ask Matrix42 to suggest a ticket type',
+    effects: [],
   });
   try {
     return JSON.parse(text);
@@ -197,18 +298,7 @@ export async function addJournalEntry(
   input: JournalEntryInput,
 ): Promise<{ added: true; journalId?: string; visibleInPortal: boolean }> {
   const visibleInPortal = input.visibleInPortal ?? false;
-  const body = compact({
-    ObjectId: input.objectId,
-    Comments: input.comments,
-    VisibleInPortal: visibleInPortal,
-    Publish: visibleInPortal,
-    EntryType: input.entryType ?? 0,
-    FileIds: input.fileIds,
-    Parameters: input.parameters?.map((p) =>
-      compact({ Name: p.name, Value: p.value, Format: p.format }),
-    ),
-  });
-  const text = await post(client, 'm42Services/api/journal/Add', body);
+  const text = await executePlan(client, planAddJournalEntry(input));
   let journalId: string | undefined;
   try {
     const parsed = JSON.parse(text) as { JournalId?: unknown };

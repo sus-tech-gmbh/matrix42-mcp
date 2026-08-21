@@ -24,6 +24,14 @@ export interface Config {
   allowWrites: boolean;
   /** Per-request timeout in milliseconds. */
   timeoutMs: number;
+  /**
+   * When true, a newly created ticket gets an internal journal entry recording that it was raised
+   * through this server. On by default: creating through the API leaves no trace that the web
+   * interface would have left, and a human picking the ticket up should be able to see that.
+   */
+  auditNote: boolean;
+  /** How the assistant is identified in that note. */
+  agentLabel: string;
 }
 
 /** Raised when the environment does not describe a usable configuration. */
@@ -31,6 +39,7 @@ export class ConfigError extends Error {}
 
 const DEFAULT_LANGUAGE = 'en-US';
 const DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_AGENT_LABEL = 'Matrix42 MCP server';
 
 /** Normalises a host or URL into an origin without a trailing slash. */
 export function normalizeBaseUrl(raw: string): string {
@@ -105,6 +114,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     enabledTools: parseList(env.M42_TOOLS),
     allowWrites: parseBool(env.M42_ALLOW_WRITES),
     timeoutMs,
+    auditNote: parseBool(env.M42_AUDIT_NOTE, true),
+    agentLabel: env.M42_AGENT_LABEL?.trim() || DEFAULT_AGENT_LABEL,
   };
 }
 

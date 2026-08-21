@@ -131,3 +131,34 @@ describe('describeConfig', () => {
     expect(described).not.toContain('hunter2');
   });
 });
+
+describe('audit note settings', () => {
+  const base = { M42_HOST: 'https://m42.example.com', M42_API_TOKEN: 't' };
+
+  it('records the API channel by default, since creating through the API leaves no other trace', () => {
+    expect(loadConfig(base).auditNote).toBe(true);
+  });
+
+  it('can be turned off explicitly', () => {
+    expect(loadConfig({ ...base, M42_AUDIT_NOTE: '0' }).auditNote).toBe(false);
+    expect(loadConfig({ ...base, M42_AUDIT_NOTE: 'false' }).auditNote).toBe(false);
+  });
+
+  it('stays on for an empty or unset value rather than failing closed', () => {
+    expect(loadConfig({ ...base, M42_AUDIT_NOTE: '' }).auditNote).toBe(true);
+  });
+
+  it('names the server by default', () => {
+    expect(loadConfig(base).agentLabel).toBe('Matrix42 MCP server');
+  });
+
+  it('lets an operator name the assistant that acts on their instance', () => {
+    expect(loadConfig({ ...base, M42_AGENT_LABEL: '  Acme Helpdesk Bot  ' }).agentLabel).toBe(
+      'Acme Helpdesk Bot',
+    );
+  });
+
+  it('falls back to the default label for a blank one', () => {
+    expect(loadConfig({ ...base, M42_AGENT_LABEL: '   ' }).agentLabel).toBe('Matrix42 MCP server');
+  });
+})

@@ -12,6 +12,7 @@ const {
   KNOWN_ACCEPTED_ACTIVITY_TYPES,
   REJECTED_ACTIVITY_TYPES,
   addJournalEntry,
+  buildAuditNote,
   classifyTicket,
   closeTickets,
   createTicket,
@@ -213,3 +214,77 @@ describe('classifyTicket', () => {
     expect(result).toEqual({ TicketType: 1 });
   });
 });
+
+describe('createTicket audit note', () => {
+  /** A client whose journal POST can be made to fail independently of the create POST. */
+  function client(journalStatus = 200) {
+    const calls: { path: string; body: Record<string, unknown> }[] = [];
+    const request = vi.fn(async (_method: string, path: string, raw?: string) => {
+      calls.push({ path, body: raw ? JSON.parse(raw) : {} });
+      if (path.includes('/journal/Add')) {
+        return journalStatus === 200
+          ? { status: 200, body: '{"JournalId":"j-1"}' }
+          : { status: journalStatus, body: '{"Message":"journal unavailable"}' };
+      }
+      return { status: 200, body: '"obj-1"' };
+    });
+    return { client: { request } as unknown as M42Client, calls };
+  }
+
+  const NOTE = { enabled: true, label: 'Matrix42 MCP server' };
+
+  it('writes no note when the feature is off', async () => {
+    const { client: c, calls } = client();
+    const result = await createTicket(c, { activityType: 6, subject: 's' }, { enabled: false, label: 'x' });
+    expect(calls.map((call) => call.path)).toEqual(['m42Services/api/ticket/Create?activityType=6']);
+    expect(result.auditNote).toBeUndefined();
+  });
+
+  it('writes no note when no options are passed at all', async () => {
+    const { calls, client: c } = client();
+    await createTicket(c, { activityType: 6, subject: 's' });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('adds the note to the ticket it just created', async () => {
+    const { client: c, calls } = client();
+    const result = await createTicket(c, { activityType: 6, subject: 's' }, NOTE);
+
+    const journal = calls.find((call) => call.path.includes('/journal/Add'));
+    expect(journal?.body.ObjectId).toBe('obj-1');
+    expect(result.auditNote).toEqual({ added: true, journalId: 'j-1' });
+  });
+
+  it('keeps the note internal — it must never reach the requester’s portal', async () => {
+    const { client: c, calls } = client();
+    await createTicket(c, { activityType: 6, subject: 's' }, NOTE);
+
+    const journal = calls.find((call) => call.path.includes('/journal/Add'));
+    expect(journal?.body.VisibleInPortal).toBe(false);
+    expect(journal?.body.Publish).toBe(false);
+  });
+
+  it('records the channel and the configured label, without impersonating a person', async () => {
+    const text = buildAuditNote('Acme Helpdesk Assistant');
+    expect(text).toContain('Acme Helpdesk Assistant');
+    expect(text).toMatch(/Matrix42 API/);
+    expect(text).toMatch(/not through the web interface/);
+  });
+
+  it('still reports the ticket as created when the note cannot be written', async () => {
+    const { client: c } = client(500);
+    const result = await createTicket(c, { activityType: 6, subject: 's' }, NOTE);
+
+    expect(result.created).toBe(true);
+    expect(result.objectId).toBe('obj-1');
+    expect(result.auditNote?.added).toBe(false);
+    expect(result.auditNote?.error).toMatch(/journal unavailable/);
+  });
+
+  it('does not attempt a note when the create itself failed', async () => {
+    const request = vi.fn(async () => ({ status: 500, body: 'nope' }));
+    const c = { request } as unknown as M42Client;
+    await expect(createTicket(c, { activityType: 6, subject: 's' }, NOTE)).rejects.toThrow();
+    expect(request).toHaveBeenCalledTimes(1);
+  });
+})

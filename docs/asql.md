@@ -1,26 +1,16 @@
-// src/asql-guide.ts — guide to ASQL, the expression language used for filters and columns.
-//
-// Written for this project from observed behaviour and this repo's own grammar notes; it links to
-// the official documentation rather than reproducing it.
-
-/**
- * Teaches the ASQL constructs a model needs to write a working filter or column list. Proprietary
- * query languages are where models hallucinate most, so this is served as its own action and is
- * paired with validate_asql.
- */
-export const ASQL_GUIDE = `# ASQL — the Matrix42 expression language
+# ASQL — the Matrix42 expression language
 
 ASQL is used in two places by the query tool:
-  - \`where\`   — a filter expression, like a SQL WHERE clause
-  - \`columns\` — a comma-separated list of column expressions to return
+  - `where`   — a filter expression, like a SQL WHERE clause
+  - `columns` — a comma-separated list of column expressions to return
 
-Every expression is written against ONE root data definition (the \`class\` you pass to the query).
+Every expression is written against ONE root data definition (the `class` you pass to the query).
 Bare identifiers resolve against that class. Identifiers are case-insensitive.
 
 ## Rule 1: never guess an attribute name
 
 Attribute sets differ per instance — modules may be absent and customers add their own fields.
-Before writing \`columns\` or \`where\`, read the real attributes with
+Before writing `columns` or `where`, read the real attributes with
 schema_discovery(action='describe_data_definition', name='<class>'). A guessed name fails with
 "Class X does not contain attribute Y".
 
@@ -28,7 +18,7 @@ Two quirks worth knowing:
   - ID is always included for you. Matrix42 sorts by ID and rejects a sort on a column that was not
     selected, so a projection without it fails.
   - DisplayString is returned automatically but CANNOT be requested explicitly — asking for it is
-    rejected on every definition. Leave it out of \`columns\`; you will get it anyway.
+    rejected on every definition. Leave it out of `columns`; you will get it anyway.
 
 Validate before you run: call action='validate_asql' with your expression and the class. It reports
 exactly which attribute or construct is wrong, which is far cheaper than a failed query.
@@ -79,14 +69,14 @@ This is the construct to reach through when the attribute you want lives on a si
 
   Owner[LastName + ', ' + FirstName]
 
-Opens an expression scope whose context is the target of \`Owner\`. Useful in \`columns\` to build a
+Opens an expression scope whose context is the target of `Owner`. Useful in `columns` to build a
 display string in one go.
 
 ## SUBQUERY(...) — correlated subqueries
 
   SUBQUERY(<BaseClass> AS <alias>, <TargetAttribute>, <Filter>)
 
-Inside the filter, \`<alias>.\` refers to the subquery's base class and \`base.\` refers to the
+Inside the filter, `<alias>.` refers to the subquery's base class and `base.` refers to the
 enclosing class, so the two can be correlated.
 
 ## [Expression-ObjectID] — the bridge to the object
@@ -152,4 +142,9 @@ answer "my items" questions.
 
 Matrix42 documents ASQL at:
   https://docs.matrix42.com  → search for "ASQL"
-That page is the authoritative reference for the full grammar and function list.`;
+That page is the authoritative reference for the full grammar and function list.
+
+---
+
+*This is the text the Matrix42 MCP server serves as the resource `matrix42://guide/asql`.
+It is generated from `src/asql-guide.ts` — edit that file and run `npm run docs`.*

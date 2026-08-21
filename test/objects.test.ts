@@ -108,6 +108,7 @@ describe('write gating', () => {
       'webservice_discovery',
       'schema_discovery',
       'data_query',
+      'service_desk',
     ]);
     expect(WRITE_TOOLS.map((t) => t.id)).toEqual(['ticket_actions']);
   });

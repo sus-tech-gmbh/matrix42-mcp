@@ -11,6 +11,7 @@ describe('ALL_TOOLS', () => {
       'webservice_discovery',
       'schema_discovery',
       'data_query',
+      'service_desk',
       'ticket_actions',
     ]);
   });

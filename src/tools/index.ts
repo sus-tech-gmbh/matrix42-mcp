@@ -4,6 +4,7 @@ import type { McpServer } from '@modelcontextprotocol/server';
 import type { ToolContext, ToolDefinition } from './types.js';
 import { dataQueryTool } from './data-query.js';
 import { schemaDiscoveryTool } from './schema-discovery.js';
+import { serviceDeskTool } from './service-desk.js';
 import { ticketActionsTool } from './ticket-actions.js';
 import { serverInfoTool } from './server-info.js';
 import { webserviceDiscoveryTool } from './webservice-discovery.js';
@@ -14,6 +15,7 @@ export const READ_TOOLS: ToolDefinition[] = [
   webserviceDiscoveryTool,
   schemaDiscoveryTool,
   dataQueryTool,
+  serviceDeskTool,
 ];
 
 /** Tools that modify Matrix42 data. Exposed only when writes are explicitly enabled. */

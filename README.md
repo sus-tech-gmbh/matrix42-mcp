@@ -1,15 +1,58 @@
 # Matrix42 MCP Server
 
-A [Model Context Protocol](https://modelcontextprotocol.io) server for **Matrix42**. It lets an AI
-assistant discover and understand your Matrix42 instance's REST API — which web services exist, what
-operations they expose, and each operation's parameters and return types.
+[![CI](https://github.com/sus-tech-gmbh/matrix42-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/sus-tech-gmbh/matrix42-mcp/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/matrix42-mcp.svg)](https://www.npmjs.com/package/matrix42-mcp)
+[![node](https://img.shields.io/node/v/matrix42-mcp.svg)](https://nodejs.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![MCP](https://img.shields.io/badge/Model_Context_Protocol-server-2f7d95.svg)](https://modelcontextprotocol.io)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
+**Give your AI assistant a safe, read-only-by-default window into Matrix42.**
+
+A [Model Context Protocol](https://modelcontextprotocol.io) server that lets an assistant explore a
+Matrix42 instance the way an experienced consultant would: find the right web service, read the real
+data model, query records with valid filters, search the service desk, and — only if you switch it
+on — act on tickets.
 
 The server holds the credentials and talks to Matrix42 on the assistant's behalf: it performs the
-API-token exchange, sets the `Explicit-Language` header, and handles TLS. The assistant never sees
-your credentials.
+API-token exchange, sets the `Explicit-Language` header, and handles TLS. **The assistant never sees
+your credentials.**
 
-> **Status:** early release. The server is **read-only by default**; write tools exist but are not
-> exposed unless `M42_ALLOW_WRITES=1`.
+```bash
+npx matrix42-mcp --help
+```
+
+> [!IMPORTANT]
+> **This is an independent community project.** It is **not affiliated with, endorsed by, sponsored
+> by, or supported by Matrix42 AG.** "Matrix42" is a trademark of its respective owner and is used
+> here only to describe what this software interoperates with. Support comes from the community via
+> [GitHub issues](https://github.com/sus-tech-gmbh/matrix42-mcp/issues) — **do not contact Matrix42
+> support about this project**, and do not expect a service-level agreement of any kind. It is
+> provided "as is" under the [MIT licence](LICENSE).
+
+> [!NOTE]
+> **Status: early release.** The server is **read-only by default** — write tools are not even listed
+> unless you set `M42_ALLOW_WRITES=1`.
+
+### Highlights
+
+- **Read-only by default.** Write tools are absent from the tool list unless explicitly enabled.
+- **Never guesses.** Every column is resolved against your instance's live schema before a query
+  runs, so a field your instance does not have is reported — not sent and turned into an opaque 500.
+- **Teaches, then acts.** Four written guides ship with the server as MCP resources, covering the
+  data model, the schema, the ASQL filter language and the REST conventions.
+- **Preview before you write.** Every write returns the exact request it *would* send until you
+  pass `confirm`. The preview is the same plan object that gets executed, so it cannot drift.
+- **Safe defaults where it counts.** Notification e-mails are off, journal entries are internal, and
+  cascading closes are opt-in.
+- **No Matrix42 code or content.** Every guide is original prose that links to the official docs
+  rather than reproducing them.
+
+### Contents
+
+- [Why](#why) · [Tools](#tools) · [Requirements](#requirements) · [Configuration](#configuration)
+- [Client setup](#client-setup) — [Claude Code](#claude-code), [Claude Desktop](#claude-desktop), [Cursor](#cursor), [VS Code](#vs-code-github-copilot)
+- [Writing data](#writing-data) · [Security notes](#security-notes) · [Development](#development) · [Contributing](#contributing)
 
 ---
 
@@ -31,7 +74,8 @@ guessing at URLs, auth, and headers.
 | `webservice_discovery` | Discovers the REST API. See the actions below. |
 | `schema_discovery` | Explores the data model: data definitions, configuration items, attributes, relations, pickup values. |
 | `data_query` | Reads records: ASQL queries, saved views, journal entries, attachments, plus an ASQL guide and validator. |
-| `ticket_actions` | **Writes** — create/close tickets and add journal entries. Only present when `M42_ALLOW_WRITES=1`. |
+| `service_desk` | Searches tickets of any kind, answers service-level questions, and browses assets, contracts, catalog services, bookings, knowledge articles, approvals, imports and workflow instances. |
+| `ticket_actions` | **Writes** — the ticket lifecycle: create, close, take over, forward, pause, reopen, set deadlines, track time, add journal entries. Only present when `M42_ALLOW_WRITES=1`. |
 
 ### `webservice_discovery` actions
 
@@ -71,6 +115,7 @@ before filtering on any pickup attribute.
 | `list_views` / `run_view` | `search?` / `view_id` | The instance's saved data queries — curated views that already carry a predefined filter. Prefer a matching view over hand-written ASQL. |
 | `list_journal` | `object_id` | An object's comment/activity timeline. |
 | `list_attachments` | `object_id` | The files attached to an object. |
+| `deep_link` | `ci_name`, `object_id?`, `link_kind?`, … | A URL into the Matrix42 web interface — either an object's detail page or a pre-filled creation form. No network call. |
 
 **Typical flow:** `asql_guide` once → `schema_discovery` to find the class and its pickup values →
 `validate_asql` → `query`. Always pass `sort` when paging; page boundaries are otherwise unstable.
@@ -78,8 +123,73 @@ before filtering on any pickup attribute.
 Numeric enums are decoded for you (`Datatype: 2` → `"Int"`, `Cardinality: 3` → `"Optional (Multi)"`),
 and customisations are flagged using the custom prefix the instance itself reports.
 
-All tools are annotated `readOnlyHint: true`, so clients can distinguish them from anything that
+### `service_desk` actions
+
+| Action | Parameters | Returns |
+| --- | --- | --- |
+| `data_model` | – | How Matrix42's modules map onto a handful of base classes — where tickets, assets, licenses, contracts, SLAs and catalog items actually live. Read it when you are unsure where something is. |
+| `search_tickets` | `kind`, plus any of `ticket_number`, `subject`, `states`, `category_name`, `initiator_name`, `recipient_name`, `recipient_role_name`, `asset_id`, `service_id`, `only_mine`+`user_id` | Matching tickets. `kind` is one of `ticket`, `incident`, `problem`, `change`, `task`, `service_request`, `kb_article`. |
+| `get_ticket` | `ticket_object_id` | One ticket's summary as the service desk sees it. |
+| `sla_for_ticket` | `ticket_object_id` | The service level agreements that apply, as Matrix42 itself computes them. |
+| `sla_times` | `ticket_object_id` | Reaction and solution time state. |
+| `browse` | `domain`, `search?`, `where?`, `limit?` | Rows of one curated domain, plus the fields this instance does not have. |
+| `find` | `search`, `domains?`, `limit?` | Searches **every** domain at once for a name — for when you do not know where something lives. Domains that fail (module not installed) are reported, not fatal. |
+
+Ticket search filters by **name**, not id: `initiator_name: "Ada Lovelace"` and
+`category_name: "Hardware"` work directly, with no GUID lookup first. Every kind shares the same
+contract, so one call shape covers the whole service desk.
+
+`browse` domains: `assets`, `stock_units`, `contracts`, `slas`, `catalog_services`, `bookings`,
+`kb_articles`, `approvals`, `imports`, `import_runs`, `workflow_instances`, `workflow_definitions`,
+`applications`. Workflows are **read-only** — this server lists definitions and instances but never
+starts, suspends, resumes or cancels them.
+
+**Columns are never guessed.** Before every `browse`, the server reads the definition's real
+attribute list from the instance and keeps only the fields that exist, reporting the rest as
+`unavailableFields`. A module you have not licensed therefore yields a shorter row, not a failed
+call. The same rule is stated in the guides and the server instructions, so a connected model
+follows it too.
+
+All read tools are annotated `readOnlyHint: true`, so clients can distinguish them from anything that
 would change data.
+
+### Prompts
+
+Reusable templates your client can offer (in Claude Desktop, the prompts menu). Each one encodes the
+order of operations this server rewards, so a model does not have to rediscover it by failing:
+
+| Prompt | For |
+| --- | --- |
+| `explore_instance` | Getting oriented in an unfamiliar instance |
+| `build_query` | Turning a question into a validated ASQL query |
+| `triage_ticket` | Working one ticket end to end, without changing anything |
+| `safe_change` | Walking a write through preview → confirm |
+| `find_endpoint` | Locating the right operation before writing integration code |
+
+### Resources
+
+The written guides are also published as MCP resources, so a client can read them without a tool
+call and attach one to a conversation up front:
+
+| URI | Contents |
+| --- | --- |
+| `matrix42://guide/data-model` | Matrix42 is one graph, not many modules |
+| `matrix42://guide/schema` | Data definitions, configuration items, fragments, pickups |
+| `matrix42://guide/asql` | The ASQL expression language |
+| `matrix42://guide/api` | REST API conventions: auth, headers, Public vs Product API |
+
+#### Links into the web interface
+
+`data_query(action='deep_link')` builds a URL an assistant can hand you. The format was not
+invented — it was read back from the instance's own URL-building operations, and the ambiguity in
+that output was settled by experiment: the id in an object link is the **object** id
+(`[Expression-ObjectID]`), not a fragment id. Links are built against the host you configured, which
+is reachable for you, rather than the instance's internal server name.
+
+The same text is checked in under [`docs/`](docs/) so it is readable on GitHub without running
+anything — start with **[Matrix42 is one graph, not many modules](docs/matrix42-data-model.md)**,
+which explains why there is no "Licenses" or "SLAs" table and where those records actually live.
+Those files are generated from the guide modules (`npm run docs`), and a test fails if they drift.
 
 ---
 
@@ -112,6 +222,8 @@ All configuration is via environment variables.
 | `M42_TOOLS` | | all | Comma-separated tool ids to expose |
 | `M42_ALLOW_WRITES` | | `0` | Set to `1` to expose tools that modify data. Write tools are not registered at all unless this is set. |
 | `M42_ALLOW_INSECURE_TLS` | | `0` | Set to `1` to skip TLS verification (self-signed dev instances only) |
+| `M42_AUDIT_NOTE` | | `1` | Mark created tickets with an internal note saying they were raised through this server. Set to `0` to disable. |
+| `M42_AGENT_LABEL` | | `Matrix42 MCP server` | How the assistant is named in that note |
 | `M42_TIMEOUT_MS` | | `30000` | Per-request timeout |
 
 ¹ Provide **either** `M42_API_TOKEN` **or** both `M42_USERNAME` and `M42_PASSWORD`.
@@ -229,12 +341,49 @@ cannot modify anything even if a model asks it to. When enabled, `ticket_actions
 
 | Action | Notes |
 | --- | --- |
-| `create_ticket` | Returns the new **object id**, which the other two actions take directly. |
+| `create_ticket` | Returns the new **object id**, which every other action takes directly. |
 | `close_ticket` | Closes by object id, with an optional solution and closing reason. |
 | `add_journal_entry` | Adds a comment to any object, with optional template `parameters`. |
 | `classify_ticket` | Only suggests a type from text — changes nothing. |
+| `take_over` / `accept` | Claims tickets. Needs `type_name`, the configuration item they belong to. |
+| `forward` | Hands tickets to a `role_id` or `user_id`, optionally applying an OLA. |
+| `pause` | Holds a ticket, optionally stopping the escalation clock (`not_escalate_while_paused`). |
+| `reopen` | Reverses a close, with a reason. |
+| `return_to_role` | Gives one ticket back to its responsible role. |
+| `set_deadline` | Sets the date the ticket must be handled by. |
+| `track_working_time` | Books effort, optionally typed (`investigation`, `resolution`, …). |
 
-Two defaults exist to prevent the mistakes that matter most in service management:
+Matrix42 wraps its state machine in these named operations rather than exposing a raw state field,
+which is what makes them safe to offer: each carries exactly the parameters its transition needs.
+
+#### Preview, then confirm
+
+Every action previews by default. Called **without** `confirm: true`, a write returns the exact
+request it would send — method, path, body — along with the consequences worth reading, and changes
+nothing:
+
+```json
+{
+  "wouldChange": true,
+  "applied": false,
+  "summary": "Close 1 ticket(s)",
+  "request": { "method": "POST", "path": "m42Services/api/ticket/Close", "body": { "…": "…" } },
+  "effects": ["No notifications are sent and nothing cascades."],
+  "next": "Nothing was changed. Show this to the user, and call again with confirm:true to apply it."
+}
+```
+
+That preview is the *same plan object* the execute path runs, so it can never describe one request
+and send another. Pass `dry_run: true` to force a preview even when `confirm` is set.
+
+Every created ticket also gets an **internal journal note** recording that it was raised through
+this server. Creating through the API otherwise leaves none of the trace the web interface leaves,
+so a human picking the ticket up has no way to tell where it came from. The note is never
+portal-visible, and if it cannot be written the ticket is still reported as created — losing an
+audit line must never look like a failed create. Turn it off with `M42_AUDIT_NOTE=0`, or name the
+assistant with `M42_AGENT_LABEL="Acme Helpdesk Assistant"`.
+
+Two further defaults exist to prevent the mistakes that matter most in service management:
 
 - **Notification e-mails are off.** `notify_initiator`, `notify_users` and `notify_responsible`
   all default to `false`; closing a ticket does not mail anyone unless you ask.
@@ -264,8 +413,13 @@ npm install
 npm run build        # compile to dist/
 npm run typecheck    # tsc --noEmit
 npm test             # unit tests (vitest)
-node scripts/smoke.mjs   # end-to-end against a real instance
+npm run docs         # regenerate docs/ from the guide modules
+node scripts/smoke.mjs                # end-to-end against a real instance
+node scripts/service-desk-smoke.mjs   # service desk, domains and lifecycle verbs
 ```
+
+`service-desk-smoke.mjs` confines its writes to a single ticket it creates itself, and closes it at
+the end; nothing pre-existing is modified and no notification e-mail is ever requested.
 
 ### Layout
 
@@ -281,7 +435,16 @@ src/
   data.ts            record queries, paging, result shaping, ASQL validation
   objects.ts         journal, attachments, saved views, current-user identity
   tickets.ts         write operations and their safety defaults
+  ticket-verbs.ts    the ticket lifecycle verbs (take over, forward, pause, reopen, …)
+  service-desk.ts    the uniform ticket Search contract and the service-level endpoints
+  columns.ts         resolves query columns from the live schema instead of assuming them
+  domains.ts         the curated domain registry (assets, contracts, catalog, …)
+  domain-guide.ts    the "one graph, not many modules" guide
   asql-guide.ts      the static ASQL guide served by asql_guide
+  resources.ts       publishes the guides as MCP resources
+  prompts.ts         reusable prompt templates
+  deep-links.ts      URLs into the Matrix42 web interface (pure string building)
+  write-plan.ts      the request a write would send, as a value — the basis of preview/confirm
   tools/             one module per tool, registered from a small registry
 ```
 
@@ -293,17 +456,59 @@ then works in `M42_TOOLS` automatically.
 ## Roadmap
 
 - Attachment upload and download
-- Approvals, and the change/problem/task lifecycles
+- Approval decisions (approve / reject), which today are read-only
 - Per-user tokens, so "my items" can mean an end user rather than the service account
 
 ---
 
 ## Contributing
 
-Issues and pull requests are welcome. Please run `npm run typecheck && npm test` before opening a PR.
+Contributions are very welcome — this is a community project and it gets better with more instances
+behind it. Matrix42 deployments differ enormously, so **a bug report that quotes the exact request
+and the exact error is worth a lot**: it is often the only way to learn that an attribute or an
+operation behaves differently elsewhere.
+
+Good first contributions:
+
+- A domain that matters to you but is missing from `src/domains.ts`.
+- A correction to a guide in `src/*-guide.ts` / `src/*-overview.ts` (then run `npm run docs`).
+- A failing case from your instance, with the request and response, as an issue.
+
+Before opening a pull request:
+
+```bash
+npm run typecheck && npm test && npm run build
+```
+
+Please keep the project's two hard rules intact: **never guess an attribute name** (resolve it
+against the live schema), and **never reproduce Matrix42's copyrighted documentation or code** —
+link to it instead. See [CONTRIBUTING.md](CONTRIBUTING.md) for the details.
+
+## Support
+
+Community support only, through
+[GitHub issues](https://github.com/sus-tech-gmbh/matrix42-mcp/issues) and
+[discussions](https://github.com/sus-tech-gmbh/matrix42-mcp/discussions). There is no SLA, and
+**Matrix42 AG cannot help you with this project** — please do not open a ticket with them about it.
+
+## Security
+
+Found a vulnerability? Please report it privately rather than in a public issue — see
+[SECURITY.md](SECURITY.md).
 
 ## License
 
-[MIT](LICENSE) © sus-tech GmbH
+[MIT](LICENSE) © 2026 [S&S Technologies GmbH](https://sus-tech.com/en)
 
-Not affiliated with or endorsed by Matrix42 AG.
+---
+
+### Disclaimer
+
+This project is an **independent, community-maintained** integration. It is **not affiliated with,
+endorsed by, sponsored by, or supported by Matrix42 AG**. "Matrix42" and any related marks belong to
+their respective owners and are used here solely to identify the software this project
+interoperates with. No Matrix42 source code or documentation is redistributed in this repository.
+
+The software is provided "as is", without warranty of any kind. You are responsible for the account
+you configure it with and for anything an assistant does through it — read
+[Security notes](#security-notes) before pointing it at a production instance.
