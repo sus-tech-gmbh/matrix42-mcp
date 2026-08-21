@@ -1,0 +1,17 @@
+# Groups the auto-generated release notes by label.
+changelog:
+  exclude:
+    labels: [ignore-for-release]
+  categories:
+    - title: Breaking changes
+      labels: [breaking]
+    - title: Features
+      labels: [enhancement, feature]
+    - title: Fixes
+      labels: [bug, fix]
+    - title: Instance compatibility
+      labels: [instance-quirk, compatibility]
+    - title: Documentation
+      labels: [documentation]
+    - title: Maintenance
+      labels: ['*']

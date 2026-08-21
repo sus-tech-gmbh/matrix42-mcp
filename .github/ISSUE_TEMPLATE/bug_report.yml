@@ -1,0 +1,48 @@
+name: Bug report
+description: Something behaved incorrectly.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Please redact tokens, hostnames and personal data** before pasting
+        anything. A token that has appeared in a public issue must be treated as compromised.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you asked the assistant to do, and what it did instead.
+    validations: { required: true }
+  - type: input
+    id: tool
+    attributes:
+      label: Tool and action
+      placeholder: "service_desk / browse"
+  - type: textarea
+    id: request
+    attributes:
+      label: The exact request
+      description: Path and query string, if you have them.
+      render: text
+  - type: textarea
+    id: response
+    attributes:
+      label: The exact response
+      description: The full error body. This is usually the single most useful thing in the report.
+      render: json
+  - type: input
+    id: version
+    attributes:
+      label: matrix42-mcp version
+      placeholder: "0.1.0"
+    validations: { required: true }
+  - type: input
+    id: m42
+    attributes:
+      label: Matrix42 version
+  - type: dropdown
+    id: writes
+    attributes:
+      label: Were writes enabled?
+      options: ['No (default)', 'Yes (M42_ALLOW_WRITES=1)']
+    validations: { required: true }

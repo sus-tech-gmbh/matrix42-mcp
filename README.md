@@ -18,6 +18,19 @@ The server holds the credentials and talks to Matrix42 on the assistant's behalf
 API-token exchange, sets the `Explicit-Language` header, and handles TLS. **The assistant never sees
 your credentials.**
 
+```mermaid
+flowchart LR
+    A["🧑 You"] --> B["🤖 AI assistant<br/>Claude · Cursor · Copilot"]
+    B <-->|"MCP over stdio"| C["matrix42-mcp"]
+    C <-->|"REST · token exchange<br/>TLS · Explicit-Language"| D[("Matrix42<br/>instance")]
+
+    C -.- E["🔒 Credentials stay here<br/>never reach the assistant"]
+
+    style C fill:#2f7d95,stroke:#1d4f5e,color:#fff
+    style D fill:#4a5568,stroke:#2d3748,color:#fff
+    style E fill:#fff8e1,stroke:#f0ad4e,color:#663c00
+```
+
 ```bash
 npx matrix42-mcp --help
 ```
@@ -66,6 +79,37 @@ guessing at URLs, auth, and headers.
 
 ---
 
+## What it can do
+
+```mermaid
+mindmap
+  root(("matrix42-mcp"))
+    Discover
+      ~1,100 API operations
+      Full request/return contracts
+      Public vs product API
+    Understand
+      785 data definitions
+      237 configuration items
+      Pickup values
+      Relations and cardinality
+    Read
+      ASQL queries with paging
+      Saved views
+      Journal and attachments
+      Deep links into the UI
+    Service desk
+      Search 7 ticket kinds by name
+      Service levels
+      13 curated domains
+      Search everything at once
+    Act
+      Create · close · classify
+      Take over · forward · pause
+      Reopen · deadline · time
+      Preview before every write
+```
+
 ## Tools
 
 | Tool | What it does |
@@ -76,6 +120,34 @@ guessing at URLs, auth, and headers.
 | `data_query` | Reads records: ASQL queries, saved views, journal entries, attachments, plus an ASQL guide and validator. |
 | `service_desk` | Searches tickets of any kind, answers service-level questions, and browses assets, contracts, catalog services, bookings, knowledge articles, approvals, imports and workflow instances. |
 | `ticket_actions` | **Writes** — the ticket lifecycle: create, close, take over, forward, pause, reopen, set deadlines, track time, add journal entries. Only present when `M42_ALLOW_WRITES=1`. |
+
+### What a conversation looks like
+
+> **You:** Which open tickets is Ada Lovelace waiting on, and are any of them past their service level?
+
+The assistant works it out without you naming a single id:
+
+```mermaid
+sequenceDiagram
+    participant You
+    participant AI as Assistant
+    participant S as matrix42-mcp
+    participant M as Matrix42
+
+    You->>AI: "Ada's open tickets, any past SLA?"
+    AI->>S: service_desk(search_tickets, initiator_name "Ada Lovelace")
+    S->>M: GET api/ticket/Search?InitiatorName=Ada+Lovelace
+    M-->>S: 4 tickets
+    S-->>AI: rows + object ids
+    loop each ticket
+        AI->>S: service_desk(sla_for_ticket)
+        S->>M: GET api/activity/suitableSLAsForTicket
+    end
+    AI->>S: data_query(deep_link) for the one at risk
+    AI-->>You: "3 open, TCK00182 breaches in 2h" + link
+```
+
+Note what did **not** happen: no GUID lookups, no guessed attribute names, and nothing was written.
 
 ### `webservice_discovery` actions
 
@@ -421,6 +493,42 @@ node scripts/service-desk-smoke.mjs   # service desk, domains and lifecycle verb
 `service-desk-smoke.mjs` confines its writes to a single ticket it creates itself, and closes it at
 the end; nothing pre-existing is modified and no notification e-mail is ever requested.
 
+### How it fits together
+
+```mermaid
+flowchart TD
+    subgraph MCP["MCP surface"]
+        T["6 tools"]
+        R["4 resources<br/>the written guides"]
+        P["5 prompts"]
+    end
+
+    subgraph DOM["Domain"]
+        SD["service-desk.ts<br/>tickets · SLAs"]
+        DM["domains.ts<br/>13 curated domains"]
+        TV["ticket-verbs.ts<br/>lifecycle"]
+        DL["deep-links.ts"]
+    end
+
+    subgraph SAFE["Correctness and safety"]
+        CO["columns.ts<br/>resolve against live schema"]
+        WP["write-plan.ts<br/>preview = the request"]
+    end
+
+    CL["m42-client.ts<br/>token exchange · TLS"]
+    M42[("Matrix42")]
+
+    MCP --> DOM --> SAFE --> CL --> M42
+
+    style SAFE fill:#fff8e1,stroke:#f0ad4e,color:#663c00
+    style CL fill:#2f7d95,stroke:#1d4f5e,color:#fff
+    style M42 fill:#4a5568,stroke:#2d3748,color:#fff
+```
+
+Two modules carry the guarantees the rest of the server relies on: `columns.ts` means no projection
+is ever sent that the instance cannot answer, and `write-plan.ts` means a preview and its request
+are the same object.
+
 ### Layout
 
 ```
@@ -490,6 +598,18 @@ Community support only, through
 [GitHub issues](https://github.com/sus-tech-gmbh/matrix42-mcp/issues) and
 [discussions](https://github.com/sus-tech-gmbh/matrix42-mcp/discussions). There is no SLA, and
 **Matrix42 AG cannot help you with this project** — please do not open a ticket with them about it.
+
+## Project
+
+| | |
+| --- | --- |
+| **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| **Code of conduct** | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
+| **Security policy** | [SECURITY.md](SECURITY.md) |
+| **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
+| **Releases** | [GitHub releases](https://github.com/sus-tech-gmbh/matrix42-mcp/releases) |
+
+Releases are published from CI on a tag, with [npm provenance](https://docs.npmjs.com/generating-provenance-statements) — the tarball on npm is cryptographically linked to the commit and workflow run that built it.
 
 ## Security
 

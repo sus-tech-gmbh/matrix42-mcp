@@ -1,0 +1,25 @@
+name: Feature request
+description: Something the server should be able to do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The task, not the implementation — it often turns out an existing tool covers it.
+    validations: { required: true }
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+  - type: input
+    id: endpoint
+    attributes:
+      label: Relevant Matrix42 operation, if you know it
+      placeholder: "api/…"
+  - type: dropdown
+    id: writes
+    attributes:
+      label: Would this modify data?
+      options: ['No, read-only', 'Yes, it writes', 'Not sure']
+    validations: { required: true }

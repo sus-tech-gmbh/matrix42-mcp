@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/sus-tech-gmbh/matrix42-mcp/discussions
+    about: Ask how something works, or float an idea before building it.
+  - name: Security vulnerability
+    url: https://github.com/sus-tech-gmbh/matrix42-mcp/security/advisories/new
+    about: Report privately. Please do not open a public issue.
+  - name: Matrix42 product support
+    url: https://matrix42.com
+    about: This project is not affiliated with Matrix42 AG. For the product itself, contact them.

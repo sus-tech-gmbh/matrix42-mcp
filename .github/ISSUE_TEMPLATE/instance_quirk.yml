@@ -1,0 +1,32 @@
+name: Instance difference
+description: Your Matrix42 instance behaves differently from what this server assumes.
+labels: [instance-quirk]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Matrix42 deployments differ enormously — a class, attribute or operation can exist on one
+        instance and not another. These reports are how the server learns to cope, so they are very
+        welcome. **Please redact tokens, hostnames and personal data.**
+  - type: input
+    id: klass
+    attributes:
+      label: Class or operation
+      placeholder: "PLSLProcessInstanceClassBase, or api/activity/Pause"
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes:
+      label: What the server assumed
+    validations: { required: true }
+  - type: textarea
+    id: actual
+    attributes:
+      label: What your instance does
+      description: Include the exact request and the exact response body.
+      render: text
+    validations: { required: true }
+  - type: input
+    id: m42
+    attributes:
+      label: Matrix42 version and installed modules
