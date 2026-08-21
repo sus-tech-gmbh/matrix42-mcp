@@ -1,6 +1,7 @@
 // src/tools/server-info.ts — reports which Matrix42 instance this server is connected to.
 
 import type { McpServer } from '@modelcontextprotocol/server';
+import { getCurrentUser } from '../objects.js';
 import { type ToolContext, type ToolDefinition, textResult, errorResult } from './types.js';
 
 /** Health/identity tool: confirms connectivity and names the connected instance. */
@@ -14,7 +15,7 @@ export const serverInfoTool: ToolDefinition = {
       {
         title: 'Matrix42 server info',
         description:
-          'Report which Matrix42 instance this MCP server is connected to (base URL, authentication mode, response language) and verify that the configured credentials work. Never returns credentials.',
+          'Report which Matrix42 instance this MCP server is connected to (base URL, authentication mode, response language), which account the credentials authenticate as, and whether the connection works. Use the reported user fragment id to answer "my items" questions. Never returns credentials.',
         annotations: { readOnlyHint: true, openWorldHint: false },
       },
       async () => {
@@ -30,6 +31,15 @@ export const serverInfoTool: ToolDefinition = {
         try {
           await client.verifyConnection();
           lines.push('Status:    connected — credentials verified');
+          try {
+            const user = await getCurrentUser(client);
+            lines.push(
+              `Acting as: ${user.displayName || '(unnamed)'} · fragmentId ${user.fragmentId}`,
+              `           ${user.note}`,
+            );
+          } catch {
+            lines.push('Acting as: could not be determined on this instance');
+          }
         } catch (error) {
           const reason = error instanceof Error ? error.message : String(error);
           return errorResult([...lines, `Status:    NOT connected — ${reason}`].join('\n'));

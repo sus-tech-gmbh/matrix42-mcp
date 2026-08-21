@@ -8,8 +8,8 @@ The server holds the credentials and talks to Matrix42 on the assistant's behalf
 API-token exchange, sets the `Explicit-Language` header, and handles TLS. The assistant never sees
 your credentials.
 
-> **Status:** early release. Every tool is **read-only** — the server reads API metadata, the data
-> model, and records, but never modifies anything.
+> **Status:** early release. The server is **read-only by default**; write tools exist but are not
+> exposed unless `M42_ALLOW_WRITES=1`.
 
 ---
 
@@ -30,7 +30,8 @@ guessing at URLs, auth, and headers.
 | `server_info` | Reports which Matrix42 instance is connected and verifies the credentials work. Never returns credentials. |
 | `webservice_discovery` | Discovers the REST API. See the actions below. |
 | `schema_discovery` | Explores the data model: data definitions, configuration items, attributes, relations, pickup values. |
-| `data_query` | Reads records: ASQL-filtered queries, single fragments, whole objects, plus an ASQL guide and validator. |
+| `data_query` | Reads records: ASQL queries, saved views, journal entries, attachments, plus an ASQL guide and validator. |
+| `ticket_actions` | **Writes** — create/close tickets and add journal entries. Only present when `M42_ALLOW_WRITES=1`. |
 
 ### `webservice_discovery` actions
 
@@ -67,6 +68,9 @@ before filtering on any pickup attribute.
 | `query` | `class`, `columns?`, `where?`, `sort?`, `page_size?`, `page?` | Rows plus typed column metadata, with paging (`hasMore`). |
 | `get_fragment` | `class`, `fragment_id` | One complete fragment. |
 | `get_object` | `ci_name`, `object_id` | One whole object (all fragments of a configuration item). |
+| `list_views` / `run_view` | `search?` / `view_id` | The instance's saved data queries — curated views that already carry a predefined filter. Prefer a matching view over hand-written ASQL. |
+| `list_journal` | `object_id` | An object's comment/activity timeline. |
+| `list_attachments` | `object_id` | The files attached to an object. |
 
 **Typical flow:** `asql_guide` once → `schema_discovery` to find the class and its pickup values →
 `validate_asql` → `query`. Always pass `sort` when paging; page boundaries are otherwise unstable.
@@ -106,6 +110,7 @@ All configuration is via environment variables.
 | `M42_USERNAME` / `M42_PASSWORD` | ✅¹ | – | Basic-auth alternative to `M42_API_TOKEN` |
 | `M42_LANGUAGE` | | `en-US` | Response language, sent as `Explicit-Language` |
 | `M42_TOOLS` | | all | Comma-separated tool ids to expose |
+| `M42_ALLOW_WRITES` | | `0` | Set to `1` to expose tools that modify data. Write tools are not registered at all unless this is set. |
 | `M42_ALLOW_INSECURE_TLS` | | `0` | Set to `1` to skip TLS verification (self-signed dev instances only) |
 | `M42_TIMEOUT_MS` | | `30000` | Per-request timeout |
 
@@ -217,6 +222,27 @@ npx matrix42-mcp --tools   # available tool ids
 
 ---
 
+## Writing data
+
+Write tools are absent from the tool list unless `M42_ALLOW_WRITES=1`, so a default deployment
+cannot modify anything even if a model asks it to. When enabled, `ticket_actions` offers:
+
+| Action | Notes |
+| --- | --- |
+| `create_ticket` | Returns the new **object id**, which the other two actions take directly. |
+| `close_ticket` | Closes by object id, with an optional solution and closing reason. |
+| `add_journal_entry` | Adds a comment to any object, with optional template `parameters`. |
+| `classify_ticket` | Only suggests a type from text — changes nothing. |
+
+Two defaults exist to prevent the mistakes that matter most in service management:
+
+- **Notification e-mails are off.** `notify_initiator`, `notify_users` and `notify_responsible`
+  all default to `false`; closing a ticket does not mail anyone unless you ask.
+- **Journal entries are internal.** `visible_in_portal` defaults to `false`, so a comment is not
+  published to the requester's self-service portal by accident.
+
+`close_related_incidents` also defaults to `false`, since it cascades to other tickets.
+
 ## Security notes
 
 - **The server is a credentialed proxy.** Anything the configured account can read through the API,
@@ -253,6 +279,8 @@ src/
   api-overview.ts    the static Matrix42 API guide served by api_overview
   schema-overview.ts the static data-model guide served by schema_overview
   data.ts            record queries, paging, result shaping, ASQL validation
+  objects.ts         journal, attachments, saved views, current-user identity
+  tickets.ts         write operations and their safety defaults
   asql-guide.ts      the static ASQL guide served by asql_guide
   tools/             one module per tool, registered from a small registry
 ```
@@ -264,9 +292,9 @@ then works in `M42_TOOLS` automatically.
 
 ## Roadmap
 
-- Executing API operations (kept as a separate, explicitly annotated tool so read-only discovery and
-  live calls can never be confused)
-- Read access to business records
+- Attachment upload and download
+- Approvals, and the change/problem/task lifecycles
+- Per-user tokens, so "my items" can mean an end user rather than the service account
 
 ---
 

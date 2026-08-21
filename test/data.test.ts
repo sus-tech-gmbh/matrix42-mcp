@@ -45,6 +45,19 @@ describe('buildQueryParams', () => {
     expect(new URLSearchParams(buildQueryParams({}, 5, 2)).get('Page')).toBeNull();
   });
 
+  it('adds ID to a projection that omits it, which Matrix42 requires for its default sort', () => {
+    const params = new URLSearchParams(buildQueryParams({ columns: 'Subject' }, 5, 1));
+    expect(params.get('Columns')).toBe('ID,Subject');
+  });
+
+  it('does not duplicate ID when the caller already selected it', () => {
+    const params = new URLSearchParams(buildQueryParams({ columns: 'ID,Subject' }, 5, 1));
+    expect(params.get('Columns')).toBe('ID,Subject');
+    expect(new URLSearchParams(buildQueryParams({ columns: 'id, Subject' }, 5, 1)).get('Columns')).toBe(
+      'id,Subject',
+    );
+  });
+
   it('trims whitespace-only options away', () => {
     const params = new URLSearchParams(buildQueryParams({ columns: '   ', where: '  ' }, 5, 1));
     expect(params.get('Columns')).toBeNull();

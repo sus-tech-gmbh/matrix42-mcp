@@ -20,6 +20,8 @@ export interface Config {
   allowInsecureTls: boolean;
   /** Tool ids the server should expose. Empty array means "all known tools". */
   enabledTools: string[];
+  /** When true, tools that modify Matrix42 data are exposed. Off unless explicitly enabled. */
+  allowWrites: boolean;
   /** Per-request timeout in milliseconds. */
   timeoutMs: number;
 }
@@ -101,6 +103,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     language: env.M42_LANGUAGE?.trim() || DEFAULT_LANGUAGE,
     allowInsecureTls: parseBool(env.M42_ALLOW_INSECURE_TLS),
     enabledTools: parseList(env.M42_TOOLS),
+    allowWrites: parseBool(env.M42_ALLOW_WRITES),
     timeoutMs,
   };
 }
@@ -110,5 +113,6 @@ export function describeConfig(config: Config): string {
   const auth = config.authMode === 'token' ? 'API token' : `basic (${config.username})`;
   const tls = config.allowInsecureTls ? ' [TLS verification DISABLED]' : '';
   const tools = config.enabledTools.length ? config.enabledTools.join(', ') : 'all';
-  return `${config.baseUrl} · auth: ${auth} · language: ${config.language} · tools: ${tools}${tls}`;
+  const mode = config.allowWrites ? 'read+write' : 'read-only';
+  return `${config.baseUrl} · auth: ${auth} · language: ${config.language} · ${mode} · tools: ${tools}${tls}`;
 }

@@ -10,6 +10,7 @@ import {
   queryFragments,
   validateAsql,
 } from '../data.js';
+import { listAttachments, listJournal, listViews, runView } from '../objects.js';
 import { type ToolContext, type ToolDefinition, textResult, errorResult } from './types.js';
 
 /**
@@ -31,11 +32,23 @@ export const dataQueryTool: ToolDefinition = {
           "action='validate_asql' checks an expression against a class and reports the exact error; validating is cheaper than a failed query. " +
           "action='query' returns rows of one data definition, with typed column metadata, an ASQL 'where' filter, 'columns' projection, 'sort', and paging. " +
           "action='get_fragment' returns one complete fragment by id; action='get_object' returns a whole object by configuration-item name and object id. " +
+          "action='list_views' lists the instance's saved data queries — curated, named views that already carry a predefined filter — and action='run_view' runs one; prefer a matching view over hand-written ASQL. " +
+          "action='list_journal' returns an object's comment timeline and action='list_attachments' its files. " +
           "Find class names and attributes with schema_discovery first, and get_pickup_values for the valid values of any pickup you filter on.",
         annotations: { readOnlyHint: true, openWorldHint: true },
         inputSchema: z.object({
           action: z
-            .enum(['asql_guide', 'validate_asql', 'query', 'get_fragment', 'get_object'])
+            .enum([
+              'asql_guide',
+              'validate_asql',
+              'query',
+              'get_fragment',
+              'get_object',
+              'list_views',
+              'run_view',
+              'list_journal',
+              'list_attachments',
+            ])
             .describe('Which data operation to perform.'),
           class: z
             .string()
@@ -47,7 +60,7 @@ export const dataQueryTool: ToolDefinition = {
             .string()
             .optional()
             .describe(
-              "Comma-separated ASQL column expressions, e.g. 'ID,Subject,[Expression-ObjectID]'. Aliases are supported ('expr AS Name'). Omit for Matrix42's default columns.",
+              "Comma-separated ASQL column expressions, e.g. 'ID,Subject,[Expression-ObjectID]'. Aliases are supported ('expr AS Name'). ID is always included. Omit for Matrix42's default columns.",
             ),
           where: z
             .string()
@@ -85,8 +98,16 @@ export const dataQueryTool: ToolDefinition = {
             .string()
             .optional()
             .describe(
-              "Object id — the value of [Expression-ObjectID] on a row. Required for action='get_object'.",
+              "Object id — the value of [Expression-ObjectID] on a row. Required for get_object, list_journal and list_attachments.",
             ),
+          view_id: z
+            .string()
+            .optional()
+            .describe("Id of a saved data query. Required for action='run_view'."),
+          search: z
+            .string()
+            .optional()
+            .describe('Filter saved views by name, description or class (list_views), or free-text search within a view (run_view).'),
         }),
       },
       async ({
@@ -97,6 +118,8 @@ export const dataQueryTool: ToolDefinition = {
         sort,
         page_size,
         page,
+        view_id,
+        search,
         expression,
         fragment_id,
         ci_name,
@@ -139,6 +162,39 @@ export const dataQueryTool: ToolDefinition = {
               }
               const row = await getFragment(client, className, fragment_id);
               return textResult(JSON.stringify(row, null, 2));
+            }
+
+            case 'list_views': {
+              const views = await listViews(client, search);
+              return textResult(JSON.stringify({ count: views.length, views }));
+            }
+
+            case 'run_view': {
+              if (!view_id) {
+                return errorResult(
+                  "view_id is required for action='run_view'. Find one with action='list_views'.",
+                );
+              }
+              const result = await runView(client, view_id, {
+                pageSize: page_size,
+                page,
+                search,
+              });
+              return textResult(JSON.stringify(result));
+            }
+
+            case 'list_journal': {
+              if (!object_id) return errorResult("object_id is required for action='list_journal'.");
+              const journal = await listJournal(client, object_id, { count: page_size });
+              return textResult(JSON.stringify(journal));
+            }
+
+            case 'list_attachments': {
+              if (!object_id) {
+                return errorResult("object_id is required for action='list_attachments'.");
+              }
+              const files = await listAttachments(client, object_id);
+              return textResult(JSON.stringify(files));
             }
 
             case 'get_object': {

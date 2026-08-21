@@ -36,8 +36,13 @@ Use the data_query tool to read actual records:
   - action='get_fragment' / 'get_object' to fetch one record in full.
 Use server_info to see which instance is connected.
 
-All tools are read-only. Prefer discovering the schema before querying: find the class, check the
-attributes, and read pickup values rather than guessing numeric codes.`;
+Prefer discovering the schema before querying: find the class, check the attributes, and read pickup
+values rather than guessing numeric codes. Saved views (data_query action='list_views') often already
+express what you want and are more reliable than hand-written filters.
+
+Tools that modify data are only present when the operator enabled writes. When they are, treat
+notification flags and portal visibility as consequential: they reach real people, and they stay off
+unless you set them deliberately.`;
 
 /** stdout belongs to the MCP protocol — every diagnostic goes to stderr. */
 function log(message: string): void {
@@ -60,6 +65,7 @@ Configuration (environment variables):
   M42_USERNAME/M42_PASSWORD  basic-auth alternative to M42_API_TOKEN
   M42_LANGUAGE             response language, default en-US (sent as Explicit-Language)
   M42_TOOLS                comma-separated tool ids to expose (default: all)
+  M42_ALLOW_WRITES         set to 1 to expose tools that modify data (default: read-only)
   M42_ALLOW_INSECURE_TLS   set to 1 to skip TLS verification (self-signed dev instances only)
   M42_TIMEOUT_MS           per-request timeout, default 30000
 
@@ -85,7 +91,7 @@ function main(): void {
   }
 
   const config = loadConfig();
-  const { tools, unknown } = selectTools(config.enabledTools);
+  const { tools, unknown } = selectTools(config.enabledTools, config.allowWrites);
   if (unknown.length > 0) {
     log(`warning: ignoring unknown tool id(s) in M42_TOOLS: ${unknown.join(', ')}`);
   }
@@ -110,6 +116,9 @@ function main(): void {
   });
 
   log(`ready — ${describeConfig(config)}`);
+  if (config.allowWrites) {
+    log('warning: write tools are ENABLED — this server can modify Matrix42 data');
+  }
   if (config.allowInsecureTls) {
     log('warning: TLS certificate verification is disabled (M42_ALLOW_INSECURE_TLS)');
   }

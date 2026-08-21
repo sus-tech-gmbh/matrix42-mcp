@@ -1,7 +1,7 @@
 // test/tools.test.ts — unit tests for tool selection and result limiting.
 
 import { describe, expect, it } from 'vitest';
-import { ALL_TOOLS, selectTools } from '../src/tools/index.js';
+import { ALL_TOOLS, READ_TOOLS, selectTools } from '../src/tools/index.js';
 import { DEFAULT_OPERATION_LIMIT, limitResults } from '../src/tools/webservice-discovery.js';
 
 describe('ALL_TOOLS', () => {
@@ -11,6 +11,7 @@ describe('ALL_TOOLS', () => {
       'webservice_discovery',
       'schema_discovery',
       'data_query',
+      'ticket_actions',
     ]);
   });
 
@@ -20,10 +21,15 @@ describe('ALL_TOOLS', () => {
 });
 
 describe('selectTools', () => {
-  it('returns every tool when no allow-list is configured', () => {
+  it('returns every READ tool when no allow-list is configured', () => {
     const { tools, unknown } = selectTools([]);
-    expect(tools).toHaveLength(ALL_TOOLS.length);
+    expect(tools).toHaveLength(READ_TOOLS.length);
     expect(unknown).toEqual([]);
+  });
+
+  it('returns every tool when no allow-list is configured and writes are enabled', () => {
+    const { tools } = selectTools([], true);
+    expect(tools).toHaveLength(ALL_TOOLS.length);
   });
 
   it('honours an explicit allow-list', () => {

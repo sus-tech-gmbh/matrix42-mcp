@@ -84,10 +84,22 @@ export function stripNoise(rows: RecordRow[]): RecordRow[] {
   });
 }
 
+/**
+ * Ensures ID is part of an explicit column list.
+ *
+ * Matrix42 sorts fragment queries by ID unless a Sort is given, and rejects sorting on a column
+ * that was not selected — so a projection without ID fails with an opaque 500.
+ */
+export function withIdColumn(columns: string): string {
+  const parts = columns.split(',').map((part) => part.trim()).filter(Boolean);
+  const hasId = parts.some((part) => /^id$/i.test(part) || /\bas\s+id$/i.test(part));
+  return hasId ? parts.join(',') : ['ID', ...parts].join(',');
+}
+
 /** Builds the query string for a fragment list request. */
 export function buildQueryParams(options: QueryOptions, fetchSize: number, page: number): string {
   const params = new URLSearchParams();
-  if (options.columns?.trim()) params.set('Columns', options.columns.trim());
+  if (options.columns?.trim()) params.set('Columns', withIdColumn(options.columns));
   if (options.where?.trim()) params.set('Where', options.where.trim());
   if (options.sort?.trim()) params.set('Sort', options.sort.trim());
   params.set('PageSize', String(fetchSize));
