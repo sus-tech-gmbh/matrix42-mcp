@@ -22,6 +22,8 @@ import {
   planSetDeadline,
   planTakeOverOrAccept,
   planTrackWorkingTime,
+  planTransform,
+  transformTickets,
   forwardTickets,
   pauseTickets,
   reopenTickets,
@@ -73,6 +75,12 @@ interface PlannableArgs {
   deadline?: string;
   minutes?: number;
   work_activity_type?: WorkActivityType;
+  source_type_name?: string;
+  target_type_name?: string;
+  init_default_values?: boolean;
+  sla?: string;
+  ola?: string;
+  recipient_role?: string;
   begin?: string;
   end?: string;
   extra_fields?: Record<string, unknown>;
@@ -171,6 +179,19 @@ function planFor(args: PlannableArgs): WritePlan | null {
       if (!args.object_ids?.length || !args.deadline) return null;
       return planSetDeadline(args.object_ids, args.deadline);
 
+    case 'transform':
+      if (!args.object_ids?.length || !args.source_type_name || !args.target_type_name) return null;
+      return planTransform({
+        objectIds: args.object_ids,
+        sourceTypeName: args.source_type_name,
+        targetTypeName: args.target_type_name,
+        initDefaultValues: args.init_default_values,
+        category: args.category,
+        sla: args.sla,
+        ola: args.ola,
+        recipientRole: args.recipient_role,
+      });
+
     case 'track_working_time':
       if (
         !args.object_ids?.length ||
@@ -212,6 +233,7 @@ export const ticketActionsTool: ToolDefinition = {
           "action='classify_ticket' only calculates a suggested ticket type from a subject and description and changes nothing. " +
           'A created ticket also gets an internal journal note recording that it was raised through this server, since creating through the API otherwise leaves no trace of where the ticket came from; pass audit_note:false to skip it. ' + +
 "The lifecycle verbs work on OBJECT ids: take_over and accept claim tickets, forward hands them to a role or user, pause holds one (optionally stopping the escalation clock), reopen reverses a close, return_to_role gives it back, set_deadline sets the handling date, and track_working_time books effort. " +
+          "action='transform' turns tickets into another type — an incident into a service request, say — which rewrites what the record IS and drops fields the target type does not have. " +
           'Notification e-mails are never sent unless you explicitly ask for them. Resolve pickup values with schema_discovery(get_pickup_values) and user, role or category ids with service_desk or data_query before calling.',
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
         inputSchema: z.object({
@@ -229,6 +251,7 @@ export const ticketActionsTool: ToolDefinition = {
               'return_to_role',
               'set_deadline',
               'track_working_time',
+              'transform',
             ])
             .describe('Which operation to perform.'),
 
@@ -322,6 +345,28 @@ export const ticketActionsTool: ToolDefinition = {
             ),
           file_ids: z.array(z.string()).optional().describe('File ids to attach to the entry.'),
 
+          source_type_name: z
+            .string()
+            .optional()
+            .describe(
+              "Configuration item the tickets are today, for action='transform'. Read it back from a row rather than assuming it.",
+            ),
+          target_type_name: z
+            .string()
+            .optional()
+            .describe("Configuration item to turn them into, for action='transform'."),
+          init_default_values: z
+            .boolean()
+            .optional()
+            .describe(
+              'Re-initialise category, responsible role and service levels for the new type. Defaults to false, which keeps the current ones.',
+            ),
+          sla: z.string().optional().describe('SLA fragment id for the transformed ticket.'),
+          ola: z.string().optional().describe('OLA fragment id for the transformed ticket.'),
+          recipient_role: z
+            .string()
+            .optional()
+            .describe('Responsible role fragment id for the transformed ticket.'),
           type_name: z
             .string()
             .optional()
@@ -543,6 +588,29 @@ export const ticketActionsTool: ToolDefinition = {
               }
               return textResult(
                 JSON.stringify(await setDeadline(client, args.object_ids, args.deadline)),
+              );
+            }
+
+            case 'transform': {
+              if (!args.object_ids?.length || !args.source_type_name || !args.target_type_name) {
+                return errorResult(
+                  "transform needs 'object_ids', 'source_type_name' and 'target_type_name'. Read the " +
+                    "source type back from the ticket rather than assuming it — a row's usedInConfigurationItems reports it.",
+                );
+              }
+              return textResult(
+                JSON.stringify(
+                  await transformTickets(client, {
+                    objectIds: args.object_ids,
+                    sourceTypeName: args.source_type_name,
+                    targetTypeName: args.target_type_name,
+                    initDefaultValues: args.init_default_values,
+                    category: args.category,
+                    sla: args.sla,
+                    ola: args.ola,
+                    recipientRole: args.recipient_role,
+                  }),
+                ),
               );
             }
 

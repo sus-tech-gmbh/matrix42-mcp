@@ -109,11 +109,15 @@ export function rejectIgnoredFilters(input: TicketSearchInput): string | null {
   return (
     `Matrix42's ticket Search accepts ${used.join(', ')} but does not apply ${used.length > 1 ? 'them' : 'it'} — ` +
     'the request would return every ticket, which is worse than failing. Only subject, ' +
-    'category_name and states actually filter here.\n' +
-    'To filter on a person, a ticket number or a related asset, query the data instead: ' +
-    "data_query(action='query', class='SPSActivityClassBase', where=...). Read the attribute names " +
-    "with schema_discovery(action='describe_data_definition') first, and check " +
-    "data_query(action='list_views') — a saved view often already expresses it."
+    'category_name and states actually filter here.\n\n' +
+    'These DO work through data_query, because the underlying columns are relations you can ' +
+    'traverse in ASQL:\n\n' +
+"  ticket_number        TicketNumber = 'TCK00154'   (or LIKE 'TCK001%')\n  initiator_name       Initiator.LastName = 'Fruhmann'   (Initiator is a relation to\n                       SPSUserClassBase, so traverse it — FirstName and MailAddress work too)\n  recipient_name       Recipient.LastName = 'Fruhmann'\n  recipient_role_name  RecipientRole.T(SPSSecurityClassRole).Name = 'Ticket Management'\n                       (SPSScRoleClassBase carries no attributes of its own)\n  asset_id             Asset.ID = '<guid>'\n  service_id           Service.ID = '<guid>'" + '\n\n' +
+    "For example: data_query(action='query', class='SPSActivityClassBase', " +
+    "columns='TicketNumber,Subject', where=\"Initiator.LastName = 'Fruhmann'\").\n" +
+    'Confirm the attribute names for this instance with ' +
+    "schema_discovery(action='describe_data_definition', include='both'), and check " +
+    "data_query(action='validate_asql') before running a filter you are unsure of."
   );
 }
 

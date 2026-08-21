@@ -243,3 +243,74 @@ export async function trackWorkingTime(
   await executePlan(client, planTrackWorkingTime(input));
   return { done: true, verb: 'TrackWorkingTime', objectIds: input.objectIds, minutes: input.minutes };
 }
+
+/** Fields a transform needs. Contract: TicketTransmutationInfo on POST api/ticket/Transform. */
+export interface TransformTickets {
+  objectIds: string[];
+  /** Configuration item the tickets are today, e.g. SPSActivityTypeTicket. */
+  sourceTypeName: string;
+  /** Configuration item to turn them into, e.g. SPSActivityTypeIncident. */
+  targetTypeName: string;
+  /** Re-initialise Category, RecipientRole, Sla and Ola for the new type. Off by default. */
+  initDefaultValues?: boolean;
+  /** Explicit values for the new type; each is a fragment id. */
+  category?: string;
+  sla?: string;
+  ola?: string;
+  recipientRole?: string;
+}
+
+/**
+ * Plans turning tickets into another type.
+ *
+ * Matrix42 calls this transmutation: an incident becomes a service request, a ticket becomes a
+ * problem. It rewrites what the record IS, so it is the most consequential verb here — the ticket
+ * keeps its number and history but changes type, and any type-specific field that does not carry
+ * over is lost.
+ */
+export function planTransform(input: TransformTickets): WritePlan {
+  if (input.sourceTypeName === input.targetTypeName) {
+    throw new M42Error(
+      `source_type_name and target_type_name are both '${input.sourceTypeName}' — nothing to transform.`,
+    );
+  }
+  const effects = [
+    `Changes what the ticket IS, from ${input.sourceTypeName} to ${input.targetTypeName}. Fields that do not exist on the target type are lost.`,
+  ];
+  effects.push(
+    input.initDefaultValues
+      ? 'Re-initialises category, responsible role and service levels for the new type.'
+      : 'Keeps the existing category, responsible role and service levels unless you set them explicitly.',
+  );
+
+  return {
+    method: 'POST',
+    path: 'm42Services/api/ticket/Transform',
+    body: compact({
+      ObjectIds: input.objectIds,
+      SourceTypeName: input.sourceTypeName,
+      TargetTypeName: input.targetTypeName,
+      InitDefaultValues: input.initDefaultValues ?? false,
+      Category: input.category,
+      Sla: input.sla,
+      Ola: input.ola,
+      RecipientRole: input.recipientRole,
+    }),
+    summary: `Transform ${input.objectIds.length} ticket(s) from ${input.sourceTypeName} to ${input.targetTypeName}`,
+    effects,
+  };
+}
+
+/** Turns tickets into another type. */
+export async function transformTickets(
+  client: M42Client,
+  input: TransformTickets,
+): Promise<{ done: true; verb: 'Transform'; objectIds: string[]; targetTypeName: string }> {
+  await executePlan(client, planTransform(input));
+  return {
+    done: true,
+    verb: 'Transform',
+    objectIds: input.objectIds,
+    targetTypeName: input.targetTypeName,
+  };
+}

@@ -6,6 +6,24 @@ Notable changes to this project. Release notes are also generated automatically 
 This project follows [Semantic Versioning](https://semver.org). Until 1.0.0, minor versions may
 contain breaking changes to tool inputs; they will always be called out here.
 
+## 0.1.4 — 2026-08-21
+
+### Added
+
+- **`ticket_actions` action `transform`** — turns tickets into another type through Matrix42’s
+  transmutation contract (an incident into a service request, a ticket into a problem). It
+  rewrites what the record IS, so it previews like every other write and names that consequence
+  explicitly: fields the target type does not have are lost. Verified end to end on a throwaway
+  ticket, which changed from SPSActivityTypeServiceRequest to SPSActivityTypeIncident.
+
+### Fixed
+
+- The refusal for a filter Matrix42 ignores now hands over **the ASQL that works** instead of vague
+  advice. `Initiator` is a relation to `SPSUserClassBase`, so `Initiator.LastName` filters
+  correctly through `data_query` — proved by comparing row counts: 102 unfiltered, 11 for a real
+  surname, 0 for one nobody has. The previous message said "use an ASQL where clause" without ever
+  naming one that worked.
+
 ## 0.1.3 — 2026-08-21
 
 ### Fixed

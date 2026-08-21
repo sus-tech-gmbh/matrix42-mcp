@@ -20,6 +20,7 @@ import {
   reopenTickets,
   returnToRole,
   setDeadline,
+  planTransform,
   takeOverOrAccept,
   trackWorkingTime,
 } from '../src/ticket-verbs.js';
@@ -390,5 +391,52 @@ describe('rejectIgnoredFilters', () => {
 
   it('lists exactly the three filters proven to narrow a result', () => {
     expect([...HONOURED_FILTERS]).toEqual(['Subject', 'CategoryName', 'States']);
+  });
+});
+
+describe('planTransform', () => {
+  const base = {
+    objectIds: ['o1'],
+    sourceTypeName: 'SPSActivityTypeTicket',
+    targetTypeName: 'SPSActivityTypeIncident',
+  };
+
+  it('sends the transmutation contract Matrix42 declares', () => {
+    const plan = planTransform(base);
+    expect(plan.path).toBe('m42Services/api/ticket/Transform');
+    expect(plan.body).toMatchObject({
+      ObjectIds: ['o1'],
+      SourceTypeName: 'SPSActivityTypeTicket',
+      TargetTypeName: 'SPSActivityTypeIncident',
+      InitDefaultValues: false,
+    });
+  });
+
+  it('refuses a transform that would change nothing', () => {
+    expect(() => planTransform({ ...base, targetTypeName: base.sourceTypeName })).toThrow(
+      /nothing to transform/,
+    );
+  });
+
+  it('warns that the record’s identity changes and fields can be lost', () => {
+    const plan = planTransform(base);
+    expect(plan.effects[0]).toMatch(/Changes what the ticket IS/);
+    expect(plan.effects[0]).toMatch(/lost/);
+  });
+
+  it('says which way the defaults go', () => {
+    expect(planTransform(base).effects[1]).toMatch(/Keeps the existing/);
+    expect(planTransform({ ...base, initDefaultValues: true }).effects[1]).toMatch(/Re-initialises/);
+  });
+
+  it('carries explicit values for the new type when given', () => {
+    const plan = planTransform({ ...base, category: 'c1', sla: 's1', ola: 'o1', recipientRole: 'r1' });
+    expect(plan.body).toMatchObject({ Category: 'c1', Sla: 's1', Ola: 'o1', RecipientRole: 'r1' });
+  });
+
+  it('omits the optional values that were not set', () => {
+    const body = planTransform(base).body ?? {};
+    expect(body).not.toHaveProperty('Category');
+    expect(body).not.toHaveProperty('Sla');
   });
 });

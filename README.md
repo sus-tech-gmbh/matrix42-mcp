@@ -400,6 +400,7 @@ cannot modify anything even if a model asks it to. When enabled, `ticket_actions
 | `return_to_role` | Gives one ticket back to its responsible role. |
 | `set_deadline` | Sets the date the ticket must be handled by. |
 | `track_working_time` | Books effort, optionally typed (`investigation`, `resolution`, …). |
+| `transform` | Turns tickets into another type — an incident into a service request, say. Rewrites what the record **is**; fields the target type lacks are lost. |
 
 Matrix42 wraps its state machine in these named operations rather than exposing a raw state field,
 which is what makes them safe to offer: each carries exactly the parameters its transition needs.
