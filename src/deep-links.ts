@@ -1,10 +1,17 @@
 // src/deep-links.ts — builds links into the Matrix42 web interface. No network calls.
 //
-// The shapes here were not invented: they were read back from the instance's own URL-building
-// operations (CallTracker.GetIncidentListUrl and CallTracker.GetNewIncidentUrl), which return
-// finished UUX URLs. The one ambiguity in that output — which of the two GUIDs is the object —
-// was settled by experiment: passing a user's FRAGMENT id produced a URL carrying that user's
-// OBJECT id, and passing the object id produced an all-zero GUID.
+// Nothing here is invented. The shapes came from the instance's own URL-building operations
+// (CallTracker.GetIncidentListUrl and CallTracker.GetNewIncidentUrl), and the two open questions
+// were then settled directly:
+//
+//   Which of the two GUIDs is the object?  Passing a user's FRAGMENT id produced a URL carrying
+//   that user's OBJECT id; passing the object id produced an all-zero GUID.
+//
+//   Is the trailing GUID required?  No. The web app declares the route itself as
+//     name: "wmObjectDetailsPage", url: "/object-details/:_type/:_id/:widgetId?"
+//   and the "?" marks widgetId optional, so a two-segment link opens the default widget.
+//
+// :_type is the CONFIGURATION ITEM name (SPSUserType), not a data definition name.
 
 /** Removes a trailing slash so segments join cleanly. */
 function origin(baseUrl: string): string {
@@ -14,18 +21,18 @@ function origin(baseUrl: string): string {
 /**
  * A link to an object's detail page.
  *
- * Takes the OBJECT id — the value of [Expression-ObjectID] — not a fragment id. The optional view
- * id selects one of the object's views; Matrix42's own builders emit it, and omitting it asks for
- * the default view.
+ * Takes the CONFIGURATION ITEM name and the OBJECT id — the value of [Expression-ObjectID] — not a
+ * data definition name and not a fragment id. The widget id is optional per the app's own route;
+ * omitting it opens the default widget.
  */
 export function objectDetailsLink(
   baseUrl: string,
   typeName: string,
   objectId: string,
-  viewId?: string,
+  widgetId?: string,
 ): string {
   const segments = ['wm', 'object-details', typeName, objectId];
-  if (viewId) segments.push(viewId);
+  if (widgetId) segments.push(widgetId);
   return `${origin(baseUrl)}/${segments.map(encodeURIComponent).join('/')}`;
 }
 
@@ -65,7 +72,7 @@ export function buildDeepLink(input: {
   baseUrl: string;
   typeName: string;
   objectId?: string;
-  viewId?: string;
+  widgetId?: string;
   application?: string;
   presetParams?: Record<string, unknown>;
 }): DeepLink {
@@ -73,10 +80,10 @@ export function buildDeepLink(input: {
     if (!input.objectId) throw new Error("An object link needs 'object_id'.");
     return {
       kind: 'object',
-      url: objectDetailsLink(input.baseUrl, input.typeName, input.objectId, input.viewId),
+      url: objectDetailsLink(input.baseUrl, input.typeName, input.objectId, input.widgetId),
       note:
-        'Opens the object in the web interface. The id must be the OBJECT id ' +
-        '([Expression-ObjectID]); a fragment id resolves to nothing.',
+        'Opens the object in the web interface. Takes the configuration item name and the OBJECT id ' +
+        '([Expression-ObjectID]) — a data definition name or a fragment id resolves to nothing.',
     };
   }
   return {

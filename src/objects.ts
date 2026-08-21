@@ -188,3 +188,28 @@ export async function getCurrentUser(client: M42Client): Promise<CurrentUser> {
       "fragmentId, e.g. \"Recipient.ID = '<fragmentId>'\" for assigned activities, or Initiator/Creator.",
   };
 }
+
+/**
+ * The configuration item an object belongs to, or null when the id is not an object id.
+ *
+ * A base data definition is reused by many configuration items — SPSActivityClassBase alone backs
+ * incidents, service requests, changes and more — so an object's id is the only reliable way to
+ * know which one a given record is. Matrix42 answers an empty string for an id it does not
+ * recognise as an object, which is exactly what a fragment id produces.
+ */
+export async function resolveObjectType(
+  client: M42Client,
+  objectId: string,
+): Promise<string | null> {
+  let raw: unknown;
+  try {
+    raw = await client.getJson<unknown>(
+      `m42Services/api/data/objectTypeName/${encodeURIComponent(objectId)}`,
+    );
+  } catch {
+    return null; // an unknown id is data, not a failure
+  }
+  if (typeof raw !== 'string') return null;
+  const name = raw.trim();
+  return name === '' ? null : name;
+}

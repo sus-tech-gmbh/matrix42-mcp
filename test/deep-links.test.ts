@@ -12,10 +12,16 @@ describe('objectDetailsLink', () => {
     );
   });
 
-  it('appends a view id when one is given', () => {
-    expect(objectDetailsLink(HOST, 'SPSUserType', 'obj-1', 'view-9')).toBe(
-      'https://matrix42.example.com/wm/object-details/SPSUserType/obj-1/view-9',
+  it('appends a widget id when one is given', () => {
+    expect(objectDetailsLink(HOST, 'SPSUserType', 'obj-1', 'widget-9')).toBe(
+      'https://matrix42.example.com/wm/object-details/SPSUserType/obj-1/widget-9',
     );
+  });
+
+  it('omits the widget segment by default, which the route declares optional', () => {
+    const url = objectDetailsLink(HOST, 'SPSUserType', 'obj-1');
+    expect(url.split('/').length).toBe(7);
+    expect(url.endsWith('/obj-1')).toBe(true);
   });
 
   it('tolerates a trailing slash on the host', () => {

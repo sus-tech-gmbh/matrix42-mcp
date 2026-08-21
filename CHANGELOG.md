@@ -22,7 +22,9 @@ contain breaking changes to tool inputs; they will always be called out here.
 - **MCP prompts** — `explore_instance`, `build_query`, `triage_ticket`, `safe_change`,
   `find_endpoint`.
 - **MCP resources** — the four written guides, also generated into `docs/` with a drift test.
-- **`data_query` action `deep_link`** — URLs into the Matrix42 web interface.
+- **`data_query` action `deep_link`** — URLs into the Matrix42 web interface. Takes just an object’s
+  id and resolves the configuration item itself, since a base definition is reused by many of them.
+  A fragment id is refused rather than turned into a link that opens nothing.
 - **Schema-driven column resolution.** Projections are resolved against the live schema before every
   query, so a field a module does not install is reported rather than sent.
 

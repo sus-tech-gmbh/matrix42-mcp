@@ -1,7 +1,13 @@
 // test/objects.test.ts — unit tests for journal, attachment and saved-view projections.
 
-import { describe, expect, it } from 'vitest';
-import { projectAttachments, projectJournal, projectViews } from '../src/objects.js';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  projectAttachments,
+  projectJournal,
+  projectViews,
+  resolveObjectType,
+} from '../src/objects.js';
+import type { M42Client } from '../src/m42-client.js';
 import { availableTools, READ_TOOLS, WRITE_TOOLS, selectTools } from '../src/tools/index.js';
 
 describe('projectJournal', () => {
@@ -123,5 +129,47 @@ describe('write gating', () => {
     const { tools, unknown } = selectTools(['ticket_actions'], true);
     expect(tools.map((t) => t.id)).toEqual(['ticket_actions']);
     expect(unknown).toEqual([]);
+  });
+});
+
+describe('resolveObjectType', () => {
+  /** A client whose getJson answers with a canned payload, or throws. */
+  function fakeClient(payload: unknown, throws = false) {
+    const getJson = vi.fn(async () => {
+      if (throws) throw new Error('404');
+      return payload;
+    });
+    return { client: { getJson } as unknown as M42Client, getJson };
+  }
+
+  it('answers the configuration item an object belongs to', async () => {
+    const { client } = fakeClient('SPSUserType');
+    expect(await resolveObjectType(client, 'obj-1')).toBe('SPSUserType');
+  });
+
+  it('asks the object-type endpoint, escaping the id', async () => {
+    const { client, getJson } = fakeClient('T');
+    await resolveObjectType(client, 'a/b');
+    expect(getJson).toHaveBeenCalledWith('m42Services/api/data/objectTypeName/a%2Fb');
+  });
+
+  it('reports a miss for a fragment id, which the API answers with an empty string', async () => {
+    const { client } = fakeClient('');
+    expect(await resolveObjectType(client, 'frag-1')).toBeNull();
+  });
+
+  it('treats whitespace as a miss too', async () => {
+    const { client } = fakeClient('   ');
+    expect(await resolveObjectType(client, 'x')).toBeNull();
+  });
+
+  it('treats an unknown id as data rather than raising', async () => {
+    const { client } = fakeClient(null, true);
+    expect(await resolveObjectType(client, 'x')).toBeNull();
+  });
+
+  it('reports a miss when the answer is not a string', async () => {
+    const { client } = fakeClient({ unexpected: true });
+    expect(await resolveObjectType(client, 'x')).toBeNull();
   });
 });

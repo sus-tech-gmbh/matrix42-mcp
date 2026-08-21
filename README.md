@@ -141,7 +141,7 @@ before filtering on any pickup attribute.
 | `list_views` / `run_view` | `search?` / `view_id` | The instance's saved data queries — curated views that already carry a predefined filter. Prefer a matching view over hand-written ASQL. |
 | `list_journal` | `object_id` | An object's comment/activity timeline. |
 | `list_attachments` | `object_id` | The files attached to an object. |
-| `deep_link` | `ci_name`, `object_id?`, `link_kind?`, … | A URL into the Matrix42 web interface — either an object's detail page or a pre-filled creation form. No network call. |
+| `deep_link` | `object_id` | A URL into the Matrix42 web interface. Resolves the object's configuration item itself, so you only need the object id. |
 
 **Typical flow:** `asql_guide` once → `schema_discovery` to find the class and its pickup values →
 `validate_asql` → `query`. Always pass `sort` when paging; page boundaries are otherwise unstable.
@@ -206,11 +206,24 @@ call and attach one to a conversation up front:
 
 #### Links into the web interface
 
-`data_query(action='deep_link')` builds a URL an assistant can hand you. The format was not
-invented — it was read back from the instance's own URL-building operations, and the ambiguity in
-that output was settled by experiment: the id in an object link is the **object** id
-(`[Expression-ObjectID]`), not a fragment id. Links are built against the host you configured, which
-is reachable for you, rather than the instance's internal server name.
+`data_query(action='deep_link')` builds a URL an assistant can hand you:
+
+```
+https://your-instance/wm/object-details/SPSActivityTypeTicket/<object id>
+```
+
+Nothing about that shape is guessed. It came from the instance's own URL-building operations, and
+the two open questions were settled directly: the id is the **object** id (proved by passing a
+fragment id and watching Matrix42 return the object id instead), and the trailing widget segment is
+optional (the web app declares its own route as `/object-details/:_type/:_id/:widgetId?`).
+
+**You only need the object id.** A base data definition is reused by many configuration items —
+`SPSActivityClassBase` alone backs incidents, service requests and changes — so the server resolves
+the real one for you rather than making you pick. Pass a wrong `ci_name` and it corrects it; pass a
+fragment id and it refuses instead of handing you a link that opens nothing.
+
+Links are built against the host you configured, which is reachable for you, rather than the
+instance's internal server name.
 
 The same text is checked in under [`docs/`](docs/) so it is readable on GitHub without running
 anything — start with **[Matrix42 is one graph, not many modules](docs/matrix42-data-model.md)**,

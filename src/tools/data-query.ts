@@ -12,6 +12,7 @@ import {
 } from '../data.js';
 import { listAttachments, listJournal, listViews, runView } from '../objects.js';
 import { buildDeepLink } from '../deep-links.js';
+import { resolveObjectType } from '../objects.js';
 import { type ToolContext, type ToolDefinition, textResult, errorResult } from './types.js';
 
 /**
@@ -100,7 +101,7 @@ export const dataQueryTool: ToolDefinition = {
             .boolean()
             .optional()
             .describe(
-              "For action='deep_link': resolve the object before returning the link, so a dead link is reported rather than handed over. Defaults to true.",
+              "For action='deep_link': resolve the object's real configuration item first, so a dead link is reported rather than handed over. Defaults to true; set false only to build a link for an id this instance cannot resolve.",
             ),
           link_kind: z
             .enum(['object', 'create'])
@@ -108,10 +109,12 @@ export const dataQueryTool: ToolDefinition = {
             .describe(
               "For action='deep_link': 'object' opens an existing record (default), 'create' opens a pre-filled creation form.",
             ),
-          link_view_id: z
+          widget_id: z
             .string()
             .optional()
-            .describe("Optional view to open the object in, for action='deep_link'."),
+            .describe(
+              "Optional widget to open the object in, for action='deep_link'. The web app declares this segment optional, so omitting it opens the default widget.",
+            ),
           application: z
             .string()
             .optional()
@@ -156,7 +159,7 @@ export const dataQueryTool: ToolDefinition = {
         object_id,
         verify,
         link_kind,
-        link_view_id,
+        widget_id,
         application,
         preset_params,
       }) => {
@@ -233,37 +236,51 @@ export const dataQueryTool: ToolDefinition = {
             }
 
             case 'deep_link': {
-              if (!ci_name) {
-                return errorResult(
-                  "deep_link needs 'ci_name' — the configuration item, e.g. SPSActivityTypeIncident.",
-                );
-              }
-              // A link built from the wrong configuration item, or from a fragment id, looks
-              // perfectly valid and opens nothing. Resolve it first so a dead link is reported
-              // here rather than discovered by whoever clicks it.
+              // The configuration item is normally discoverable from the object itself. A base
+              // definition is reused by many of them, so asking the caller to pick one invites a
+              // link that is syntactically perfect and opens nothing.
+              let typeName = ci_name;
+              let resolvedFrom: string | undefined;
+
               if (object_id && verify !== false) {
-                const resolved = await getObject(client, ci_name, object_id);
-                if (resolved === null) {
+                const actual = await resolveObjectType(client, object_id);
+                if (actual === null) {
                   return errorResult(
-                    `No object ${object_id} of configuration item '${ci_name}', so this link would open nothing. ` +
-                      'Two things commonly cause that: the id is a FRAGMENT id rather than the object id ' +
-                      '(select [Expression-ObjectID] to get the right one), or the object belongs to a ' +
-                      "different configuration item — check the class's usedInConfigurationItems with " +
-                      'schema_discovery. Pass verify:false to build the link anyway.',
+                    `${object_id} is not an object id, so no link can be built for it. ` +
+                      'Object ids come from [Expression-ObjectID]; a row\'s ID column is its FRAGMENT id, ' +
+                      'which Matrix42 does not resolve to an object. Re-query selecting ' +
+                      '[Expression-ObjectID], or pass verify:false with an explicit ci_name to build the ' +
+                      'link unchecked.',
                   );
                 }
+                if (ci_name && ci_name !== actual) resolvedFrom = ci_name;
+                typeName = actual;
               }
+
+              if (!typeName) {
+                return errorResult(
+                  "deep_link needs 'object_id' so the configuration item can be resolved, or an " +
+                    "explicit 'ci_name' (e.g. SPSActivityTypeIncident) for a creation link.",
+                );
+              }
+
               try {
                 const link = buildDeepLink({
                   kind: link_kind ?? 'object',
                   baseUrl: config.baseUrl,
-                  typeName: ci_name,
+                  typeName,
                   objectId: object_id,
-                  viewId: link_view_id,
+                  widgetId: widget_id,
                   application,
                   presetParams: preset_params,
                 });
-                return textResult(JSON.stringify(link, null, 2));
+                const payload = resolvedFrom
+                  ? {
+                      ...link,
+                      correctedConfigurationItem: `This object is a '${typeName}', not a '${resolvedFrom}' — the link uses the real one.`,
+                    }
+                  : link;
+                return textResult(JSON.stringify(payload, null, 2));
               } catch (error) {
                 return errorResult(error instanceof Error ? error.message : String(error));
               }
