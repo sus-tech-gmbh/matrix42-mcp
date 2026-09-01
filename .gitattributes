@@ -1,0 +1,8 @@
+# Line endings are LF everywhere, in the repository and in the working tree.
+#
+# Without this, a checkout on Windows materialises CRLF, and test/docs.test.ts compares a file read
+# from disk against a template literal. JavaScript normalises line endings inside template literals
+# to LF, so the two never match and the docs drift test fails with a diff in which both sides look
+# identical. It then passes again after `npm run docs`, because Node writes LF, until the next
+# checkout. There are no .bat, .cmd or .ps1 files here, so nothing needs CRLF.
+* text=auto eol=lf
