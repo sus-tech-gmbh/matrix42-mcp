@@ -11,8 +11,8 @@
 
 A [Model Context Protocol](https://modelcontextprotocol.io) server that lets an assistant explore a
 Matrix42 instance the way an experienced consultant would: find the right web service, read the real
-data model, query records with valid filters, search the service desk, and — only if you switch it
-on — act on tickets.
+data model, query records with valid filters, search the service desk, and - only if you switch it
+on - act on tickets.
 
 The server holds the credentials and talks to Matrix42 on the assistant's behalf: it performs the
 API-token exchange, sets the `Explicit-Language` header, and handles TLS. **The assistant never sees
@@ -30,19 +30,19 @@ npx matrix42-mcp --help
 > **This is an independent community project.** It is **not affiliated with, endorsed by, sponsored
 > by, or supported by Matrix42 AG.** "Matrix42" is a trademark of its respective owner and is used
 > here only to describe what this software interoperates with. Support comes from the community via
-> [GitHub issues](https://github.com/sus-tech-gmbh/matrix42-mcp/issues) — **do not contact Matrix42
+> [GitHub issues](https://github.com/sus-tech-gmbh/matrix42-mcp/issues) - **do not contact Matrix42
 > support about this project**, and do not expect a service-level agreement of any kind. It is
 > provided "as is" under the [MIT licence](LICENSE).
 
 > [!NOTE]
-> **Status: early release.** The server is **read-only by default** — write tools are not even listed
+> **Status: early release.** The server is **read-only by default** - write tools are not even listed
 > unless you set `M42_ALLOW_WRITES=1`.
 
-### Highlights
+## Highlights
 
 - **Read-only by default.** Write tools are absent from the tool list unless explicitly enabled.
 - **Never guesses.** Every column is resolved against your instance's live schema before a query
-  runs, so a field your instance does not have is reported — not sent and turned into an opaque 500.
+  runs, so a field your instance does not have is reported - not sent and turned into an opaque 500.
 - **Teaches, then acts.** Four written guides ship with the server as MCP resources, covering the
   data model, the schema, the ASQL filter language and the REST conventions.
 - **Preview before you write.** Every write returns the exact request it *would* send until you
@@ -52,11 +52,53 @@ npx matrix42-mcp --help
 - **No Matrix42 code or content.** Every guide is original prose that links to the official docs
   rather than reproducing them.
 
-### Contents
+---
 
-- [Why](#why) · [Tools](#tools) · [Requirements](#requirements) · [Configuration](#configuration)
-- [Client setup](#client-setup) — [Claude Code](#claude-code), [Claude Desktop](#claude-desktop), [Cursor](#cursor), [VS Code](#vs-code-github-copilot)
-- [Writing data](#writing-data) · [Security notes](#security-notes) · [Development](#development) · [Contributing](#contributing)
+## Table of contents
+
+**Understand it**
+
+- [Why](#why)
+- [What it can do](#what-it-can-do)
+  - [What a conversation looks like](#what-a-conversation-looks-like)
+
+**Set it up**
+
+- [Requirements](#requirements)
+  - [Creating an API token](#creating-an-api-token)
+- [Configuration](#configuration)
+- [Client setup](#client-setup)
+  - [Claude Code](#claude-code)
+  - [Claude Desktop](#claude-desktop)
+  - [Cursor](#cursor)
+  - [VS Code (GitHub Copilot)](#vs-code-github-copilot)
+- [Verifying the connection](#verifying-the-connection)
+
+**Use it**
+
+- [Tools and actions](#tools-and-actions)
+  - [`webservice_discovery` actions](#webservice_discovery-actions)
+  - [`schema_discovery` actions](#schema_discovery-actions)
+  - [`data_query` actions](#data_query-actions)
+    - [Links into the web interface](#links-into-the-web-interface)
+  - [`service_desk` actions](#service_desk-actions)
+  - [`ticket_actions` actions (writing data)](#ticket_actions-actions-writing-data)
+    - [Preview, then confirm](#preview-then-confirm)
+  - [Prompts](#prompts)
+  - [Resources](#resources)
+- [Security notes](#security-notes)
+
+**Work on it**
+
+- [Development](#development)
+  - [How it fits together](#how-it-fits-together)
+  - [Layout](#layout)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [Support](#support)
+- [Project](#project)
+- [Security](#security)
+- [License](#license)
 
 ---
 
@@ -65,7 +107,7 @@ npx matrix42-mcp --help
 Matrix42's API surface is large (a typical instance exposes ~190 web services and ~1,100 operations),
 plus a data model of ~800 data definitions and ~240 configuration items, and an assistant has no way
 to know what exists. Point it at this server and it can search for the
-right endpoint, read the exact contract, and then write correct integration code — instead of
+right endpoint, read the exact contract, and then write correct integration code - instead of
 guessing at URLs, auth, and headers.
 
 ---
@@ -78,18 +120,7 @@ guessing at URLs, auth, and headers.
 | **Understand the model** | 785 data definitions, 237 configuration items, pickup values, relations and cardinality |
 | **Read records** | ASQL queries with paging, saved views, journal, attachments, and links into the web interface |
 | **Work the service desk** | Search seven ticket kinds by name, service levels, thirteen curated domains, or search all of them at once |
-| **Act on tickets** | Create, close, classify, take over, forward, pause, reopen, set deadlines, track time — each previewed first |
-
-## Tools
-
-| Tool | What it does |
-| --- | --- |
-| `server_info` | Reports which Matrix42 instance is connected and verifies the credentials work. Never returns credentials. |
-| `webservice_discovery` | Discovers the REST API. See the actions below. |
-| `schema_discovery` | Explores the data model: data definitions, configuration items, attributes, relations, pickup values. |
-| `data_query` | Reads records: ASQL queries, saved views, journal entries, attachments, plus an ASQL guide and validator. |
-| `service_desk` | Searches tickets of any kind, answers service-level questions, and browses assets, contracts, catalog services, bookings, knowledge articles, approvals, imports and workflow instances. |
-| `ticket_actions` | **Writes** — the ticket lifecycle: create, close, take over, forward, pause, reopen, set deadlines, track time, add journal entries. Only present when `M42_ALLOW_WRITES=1`. |
+| **Act on tickets** | Create, close, classify, take over, forward, pause, reopen, set deadlines, track time - each previewed first |
 
 ### What a conversation looks like
 
@@ -98,145 +129,10 @@ guessing at URLs, auth, and headers.
 The assistant works it out without you naming a single id:
 
 <p align="center">
-  <img src="docs/assets/example.svg" alt="The assistant searches tickets by category and state, checks the service level of each, builds a deep link for the one at risk, and answers — without looking up a single id or writing anything." width="900">
+  <img src="docs/assets/example.svg" alt="The assistant searches tickets by category and state, checks the service level of each, builds a deep link for the one at risk, and answers - without looking up a single id or writing anything." width="900">
 </p>
 
 Note what did **not** happen: no GUID lookups, no guessed attribute names, and nothing was written. Note also what the server refuses: a filter Matrix42 accepts but never applies, so an unfiltered answer is never mistaken for a filtered one.
-
-### `webservice_discovery` actions
-
-| Action | Parameters | Returns |
-| --- | --- | --- |
-| `api_overview` | – | General Matrix42 API conventions: token exchange, `Explicit-Language`, Public vs Product API, common data surfaces. Useful before writing standalone integration code. |
-| `list_operations` | `search?`, `service_id?`, `limit?` | Operations as `{id, name, method, path, service, documentation}`. `search` filters on name, documentation, and service name. Defaults to the first 200 matches; pass `limit: 0` for all. |
-| `list_services` | – | Every web service with its route prefix and documentation. |
-| `describe_operation` | `operation_id` | One operation's full contract: HTTP method, path, parameters with types, and return type. |
-
-**Typical flow:** `api_overview` once → `list_operations` with a search term → `describe_operation`
-on the one you want.
-
-### `schema_discovery` actions
-
-| Action | Parameters | Returns |
-| --- | --- | --- |
-| `schema_overview` | – | How the Matrix42 data model fits together: data definitions vs configuration items, fragments and multi-fragments, cardinality, pickups, and where to find the official docs. |
-| `list_data_definitions` | `search?`, `include_pickups?`, `limit?` | Definitions as `{internalName, displayName, description, classType, isPickup, isCustom}`. Pickup classes are excluded unless asked for. |
-| `list_configuration_items` | `search?`, `limit?` | Items with their main class and member definitions. |
-| `describe_data_definition` | `name`, `include?` | Attributes with decoded datatypes and pickup cross-links. Relations are excluded by default (a central definition can have 150+) — pass `include: "relations"` or `"both"`. |
-| `describe_configuration_item` | `name` | The definitions an object is composed of, each with its cardinality and a `isMultiFragment` flag. |
-| `get_pickup_values` | `pickup_class` **or** `name`+`attribute` | The selectable `{value, label}` pairs — so a model filters on real values instead of guessing codes. |
-
-**Typical flow:** `schema_overview` → `list_*` with a search term → `describe_*` → `get_pickup_values`
-before filtering on any pickup attribute.
-
-### `data_query` actions
-
-| Action | Parameters | Returns |
-| --- | --- | --- |
-| `asql_guide` | – | The ASQL expression language used by `where` and `columns`: operators, dot chains, pickups, `T(...)` pivots, subqueries, `[Expression-ObjectID]`. |
-| `validate_asql` | `class`, `expression` | Whether an expression is valid, with the exact error (e.g. *"does not contain attribute Nope"*). Cheaper than a failed query. |
-| `query` | `class`, `columns?`, `where?`, `sort?`, `page_size?`, `page?` | Rows plus typed column metadata, with paging (`hasMore`). |
-| `get_fragment` | `class`, `fragment_id` | One complete fragment. |
-| `get_object` | `ci_name`, `object_id` | One whole object (all fragments of a configuration item). |
-| `list_views` / `run_view` | `search?` / `view_id` | The instance's saved data queries — curated views that already carry a predefined filter. Prefer a matching view over hand-written ASQL. |
-| `list_journal` | `object_id` | An object's comment/activity timeline. |
-| `list_attachments` | `object_id` | The files attached to an object. |
-| `deep_link` | `object_id`, `view_type?` | A URL into the Matrix42 web interface — preview, edit, create or run an action. Resolves the object's configuration item itself, so you only need the object id. |
-
-**Typical flow:** `asql_guide` once → `schema_discovery` to find the class and its pickup values →
-`validate_asql` → `query`. Always pass `sort` when paging; page boundaries are otherwise unstable.
-
-Numeric enums are decoded for you (`Datatype: 2` → `"Int"`, `Cardinality: 3` → `"Optional (Multi)"`),
-and customisations are flagged using the custom prefix the instance itself reports.
-
-### `service_desk` actions
-
-| Action | Parameters | Returns |
-| --- | --- | --- |
-| `data_model` | – | How Matrix42's modules map onto a handful of base classes — where tickets, assets, licenses, contracts, SLAs and catalog items actually live. Read it when you are unsure where something is. |
-| `search_tickets` | `kind`, plus `subject`, `category_name` and/or `states` | Matching tickets. `kind` is one of `ticket`, `incident`, `problem`, `change`, `task`, `service_request`, `kb_article`. Other filter parameters exist but Matrix42 ignores them, so passing one is refused. |
-| `get_ticket` | `ticket_object_id` | One ticket's summary as the service desk sees it. |
-| `sla_for_ticket` | `ticket_object_id` | The service level agreements that apply, as Matrix42 itself computes them. |
-| `sla_times` | `ticket_object_id` | Reaction and solution time state. |
-| `browse` | `domain`, `search?`, `where?`, `limit?` | Rows of one curated domain, plus the fields this instance does not have. |
-| `find` | `search`, `domains?`, `limit?` | Searches **every** domain at once for a name — for when you do not know where something lives. Domains that fail (module not installed) are reported, not fatal. |
-
-Every kind shares the same contract, so one call shape covers the whole service desk. **Only
-`subject`, `category_name` and `states` actually filter it** — Matrix42 accepts
-`initiator_name`, `ticket_number`, `asset_id` and the rest, then ignores them and returns every
-ticket. Passing one is refused rather than handing back an unfiltered result you would read as
-filtered; the refusal points at `data_query` with an ASQL `where`, which does filter on those.
-
-`browse` domains: `assets`, `stock_units`, `contracts`, `slas`, `catalog_services`, `bookings`,
-`kb_articles`, `approvals`, `imports`, `import_runs`, `workflow_instances`, `workflow_definitions`,
-`applications`. Workflows are **read-only** — this server lists definitions and instances but never
-starts, suspends, resumes or cancels them.
-
-**Columns are never guessed.** Before every `browse`, the server reads the definition's real
-attribute list from the instance and keeps only the fields that exist, reporting the rest as
-`unavailableFields`. A module you have not licensed therefore yields a shorter row, not a failed
-call. The same rule is stated in the guides and the server instructions, so a connected model
-follows it too.
-
-All read tools are annotated `readOnlyHint: true`, so clients can distinguish them from anything that
-would change data.
-
-### Prompts
-
-Reusable templates your client can offer (in Claude Desktop, the prompts menu). Each one encodes the
-order of operations this server rewards, so a model does not have to rediscover it by failing:
-
-| Prompt | For |
-| --- | --- |
-| `explore_instance` | Getting oriented in an unfamiliar instance |
-| `build_query` | Turning a question into a validated ASQL query |
-| `triage_ticket` | Working one ticket end to end, without changing anything |
-| `safe_change` | Walking a write through preview → confirm |
-| `find_endpoint` | Locating the right operation before writing integration code |
-
-### Resources
-
-The written guides are also published as MCP resources, so a client can read them without a tool
-call and attach one to a conversation up front:
-
-| URI | Contents |
-| --- | --- |
-| `matrix42://guide/data-model` | Matrix42 is one graph, not many modules |
-| `matrix42://guide/schema` | Data definitions, configuration items, fragments, pickups |
-| `matrix42://guide/asql` | The ASQL expression language |
-| `matrix42://guide/api` | REST API conventions: auth, headers, Public vs Product API |
-
-#### Links into the web interface
-
-`data_query(action='deep_link')` builds a URL an assistant can hand you, in the format Matrix42
-documents for deep linking:
-
-```
-https://your-instance/wm/app-ServiceDesk/?view-options={"type":"SPSActivityTypeTicket",
-                                                        "viewType":"preview",
-                                                        "objectId":"<object id>"}
-```
-
-`view_type` selects what opens: `preview` (default, read-only), `edit`, `new` for a creation form,
-or `action` for a wizard. Only `new` works without an object id, and `action` additionally needs an
-`action_id`. Nothing is ever changed by opening a link — even `edit` waits for a person to save.
-
-**You only need the object id.** A base data definition is reused by many configuration items —
-`SPSActivityClassBase` alone backs incidents, service requests and changes — so the server resolves
-the real one for you rather than making you pick. Pass a wrong `ci_name` and it corrects it; pass a
-fragment id and it refuses instead of handing you a link that opens nothing.
-
-**Links target the web interface's own origin, not the API host you connected to.** Those are often
-different: an instance reachable at an IP commonly serves its UUX under a real name, and the shell's
-`config.json` says which. Loading the shell from the wrong origin leaves the app calling an origin
-it was not served from, which fails after the page has already appeared to load. The server reads
-that origin from the instance and reports it as `webInterface` alongside the link; `M42_UI_URL`
-overrides it.
-
-The same text is checked in under [`docs/`](docs/) so it is readable on GitHub without running
-anything — start with **[Matrix42 is one graph, not many modules](docs/matrix42-data-model.md)**,
-which explains why there is no "Licenses" or "SLAs" table and where those records actually live.
-Those files are generated from the guide modules (`npm run docs`), and a test fails if they drift.
 
 ---
 
@@ -262,9 +158,9 @@ All configuration is via environment variables.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `M42_HOST` | ✅ | – | Base URL of the instance, e.g. `https://matrix42.example.com` |
-| `M42_API_TOKEN` | ✅¹ | – | API token; exchanged for an access token automatically |
-| `M42_USERNAME` / `M42_PASSWORD` | ✅¹ | – | Basic-auth alternative to `M42_API_TOKEN` |
+| `M42_HOST` | ✅ | - | Base URL of the instance, e.g. `https://matrix42.example.com` |
+| `M42_API_TOKEN` | ✅¹ | - | API token; exchanged for an access token automatically |
+| `M42_USERNAME` / `M42_PASSWORD` | ✅¹ | - | Basic-auth alternative to `M42_API_TOKEN` |
 | `M42_LANGUAGE` | | `en-US` | Response language, sent as `Explicit-Language` |
 | `M42_TOOLS` | | all | Comma-separated tool ids to expose |
 | `M42_ALLOW_WRITES` | | `0` | Set to `1` to expose tools that modify data. Write tools are not registered at all unless this is set. |
@@ -280,7 +176,7 @@ All configuration is via environment variables.
 
 ## Client setup
 
-The server runs over **stdio**: your MCP client starts it. No install step is needed — `npx` fetches
+The server runs over **stdio**: your MCP client starts it. No install step is needed - `npx` fetches
 it on demand.
 
 ### Claude Code
@@ -333,7 +229,7 @@ claude mcp add matrix42 \
 
 ### VS Code (GitHub Copilot)
 
-`.vscode/mcp.json` — this shape prompts for the token instead of storing it in the file:
+`.vscode/mcp.json` - this shape prompts for the token instead of storing it in the file:
 
 ```json
 {
@@ -382,7 +278,126 @@ npx matrix42-mcp --tools   # available tool ids
 
 ---
 
-## Writing data
+## Tools and actions
+
+Six tools, each grouping a set of actions. Everything the server can do lives here - the read tools
+first, then the one that writes.
+
+| Tool | What it does |
+| --- | --- |
+| `server_info` | Reports which Matrix42 instance is connected and verifies the credentials work. Never returns credentials. |
+| `webservice_discovery` | Discovers the REST API. See the actions below. |
+| `schema_discovery` | Explores the data model: data definitions, configuration items, attributes, relations, pickup values. |
+| `data_query` | Reads records: ASQL queries, saved views, journal entries, attachments, plus an ASQL guide and validator. |
+| `service_desk` | Searches tickets of any kind, answers service-level questions, and browses assets, contracts, catalog services, bookings, knowledge articles, approvals, imports and workflow instances. |
+| `ticket_actions` | **Writes** - the ticket lifecycle: create, close, take over, forward, pause, reopen, set deadlines, track time, add journal entries. Only present when `M42_ALLOW_WRITES=1`. |
+
+### `webservice_discovery` actions
+
+| Action | Parameters | Returns |
+| --- | --- | --- |
+| `api_overview` | - | General Matrix42 API conventions: token exchange, `Explicit-Language`, Public vs Product API, common data surfaces. Useful before writing standalone integration code. |
+| `list_operations` | `search?`, `service_id?`, `limit?` | Operations as `{id, name, method, path, service, documentation}`. `search` filters on name, documentation, and service name. Defaults to the first 200 matches; pass `limit: 0` for all. |
+| `list_services` | - | Every web service with its route prefix and documentation. |
+| `describe_operation` | `operation_id` | One operation's full contract: HTTP method, path, parameters with types, and return type. |
+
+**Typical flow:** `api_overview` once → `list_operations` with a search term → `describe_operation`
+on the one you want.
+
+### `schema_discovery` actions
+
+| Action | Parameters | Returns |
+| --- | --- | --- |
+| `schema_overview` | - | How the Matrix42 data model fits together: data definitions vs configuration items, fragments and multi-fragments, cardinality, pickups, and where to find the official docs. |
+| `list_data_definitions` | `search?`, `include_pickups?`, `limit?` | Definitions as `{internalName, displayName, description, classType, isPickup, isCustom}`. Pickup classes are excluded unless asked for. |
+| `list_configuration_items` | `search?`, `limit?` | Items with their main class and member definitions. |
+| `describe_data_definition` | `name`, `include?` | Attributes with decoded datatypes and pickup cross-links. Relations are excluded by default (a central definition can have 150+) - pass `include: "relations"` or `"both"`. |
+| `describe_configuration_item` | `name` | The definitions an object is composed of, each with its cardinality and a `isMultiFragment` flag. |
+| `get_pickup_values` | `pickup_class` **or** `name`+`attribute` | The selectable `{value, label}` pairs - so a model filters on real values instead of guessing codes. |
+
+**Typical flow:** `schema_overview` → `list_*` with a search term → `describe_*` → `get_pickup_values`
+before filtering on any pickup attribute.
+
+### `data_query` actions
+
+| Action | Parameters | Returns |
+| --- | --- | --- |
+| `asql_guide` | - | The ASQL expression language used by `where` and `columns`: operators, dot chains, pickups, `T(...)` pivots, subqueries, `[Expression-ObjectID]`. |
+| `validate_asql` | `class`, `expression` | Whether an expression is valid, with the exact error (e.g. *"does not contain attribute Nope"*). Cheaper than a failed query. |
+| `query` | `class`, `columns?`, `where?`, `sort?`, `page_size?`, `page?` | Rows plus typed column metadata, with paging (`hasMore`). |
+| `get_fragment` | `class`, `fragment_id` | One complete fragment. |
+| `get_object` | `ci_name`, `object_id` | One whole object (all fragments of a configuration item). |
+| `list_views` / `run_view` | `search?` / `view_id` | The instance's saved data queries - curated views that already carry a predefined filter. Prefer a matching view over hand-written ASQL. |
+| `list_journal` | `object_id` | An object's comment/activity timeline. |
+| `list_attachments` | `object_id` | The files attached to an object. |
+| `deep_link` | `object_id`, `view_type?` | A URL into the Matrix42 web interface - preview, edit, create or run an action. Resolves the object's configuration item itself, so you only need the object id. |
+
+**Typical flow:** `asql_guide` once → `schema_discovery` to find the class and its pickup values →
+`validate_asql` → `query`. Always pass `sort` when paging; page boundaries are otherwise unstable.
+
+Numeric enums are decoded for you (`Datatype: 2` → `"Int"`, `Cardinality: 3` → `"Optional (Multi)"`),
+and customisations are flagged using the custom prefix the instance itself reports.
+
+#### Links into the web interface
+
+`data_query(action='deep_link')` builds a URL an assistant can hand you, in the format Matrix42
+documents for deep linking:
+
+```
+https://your-instance/wm/app-ServiceDesk/?view-options={"type":"SPSActivityTypeTicket",
+                                                        "viewType":"preview",
+                                                        "objectId":"<object id>"}
+```
+
+`view_type` selects what opens: `preview` (default, read-only), `edit`, `new` for a creation form,
+or `action` for a wizard. Only `new` works without an object id, and `action` additionally needs an
+`action_id`. Nothing is ever changed by opening a link - even `edit` waits for a person to save.
+
+**You only need the object id.** A base data definition is reused by many configuration items -
+`SPSActivityClassBase` alone backs incidents, service requests and changes - so the server resolves
+the real one for you rather than making you pick. Pass a wrong `ci_name` and it corrects it; pass a
+fragment id and it refuses instead of handing you a link that opens nothing.
+
+**Links target the web interface's own origin, not the API host you connected to.** Those are often
+different: an instance reachable at an IP commonly serves its UUX under a real name, and the shell's
+`config.json` says which. Loading the shell from the wrong origin leaves the app calling an origin
+it was not served from, which fails after the page has already appeared to load. The server reads
+that origin from the instance and reports it as `webInterface` alongside the link; `M42_UI_URL`
+overrides it.
+
+### `service_desk` actions
+
+| Action | Parameters | Returns |
+| --- | --- | --- |
+| `data_model` | - | How Matrix42's modules map onto a handful of base classes - where tickets, assets, licenses, contracts, SLAs and catalog items actually live. Read it when you are unsure where something is. |
+| `search_tickets` | `kind`, plus `subject`, `category_name` and/or `states` | Matching tickets. `kind` is one of `ticket`, `incident`, `problem`, `change`, `task`, `service_request`, `kb_article`. Other filter parameters exist but Matrix42 ignores them, so passing one is refused. |
+| `get_ticket` | `ticket_object_id` | One ticket's summary as the service desk sees it. |
+| `sla_for_ticket` | `ticket_object_id` | The service level agreements that apply, as Matrix42 itself computes them. |
+| `sla_times` | `ticket_object_id` | Reaction and solution time state. |
+| `browse` | `domain`, `search?`, `where?`, `limit?` | Rows of one curated domain, plus the fields this instance does not have. |
+| `find` | `search`, `domains?`, `limit?` | Searches **every** domain at once for a name - for when you do not know where something lives. Domains that fail (module not installed) are reported, not fatal. |
+
+Every kind shares the same contract, so one call shape covers the whole service desk. **Only
+`subject`, `category_name` and `states` actually filter it** - Matrix42 accepts
+`initiator_name`, `ticket_number`, `asset_id` and the rest, then ignores them and returns every
+ticket. Passing one is refused rather than handing back an unfiltered result you would read as
+filtered; the refusal points at `data_query` with an ASQL `where`, which does filter on those.
+
+`browse` domains: `assets`, `stock_units`, `contracts`, `slas`, `catalog_services`, `bookings`,
+`kb_articles`, `approvals`, `imports`, `import_runs`, `workflow_instances`, `workflow_definitions`,
+`applications`. Workflows are **read-only** - this server lists definitions and instances but never
+starts, suspends, resumes or cancels them.
+
+**Columns are never guessed.** Before every `browse`, the server reads the definition's real
+attribute list from the instance and keeps only the fields that exist, reporting the rest as
+`unavailableFields`. A module you have not licensed therefore yields a shorter row, not a failed
+call. The same rule is stated in the guides and the server instructions, so a connected model
+follows it too.
+
+All read tools are annotated `readOnlyHint: true`, so clients can distinguish them from anything that
+would change data.
+
+### `ticket_actions` actions (writing data)
 
 Write tools are absent from the tool list unless `M42_ALLOW_WRITES=1`, so a default deployment
 cannot modify anything even if a model asks it to. When enabled, `ticket_actions` offers:
@@ -392,7 +407,7 @@ cannot modify anything even if a model asks it to. When enabled, `ticket_actions
 | `create_ticket` | Returns the new **object id**, which every other action takes directly. |
 | `close_ticket` | Closes by object id, with an optional solution and closing reason. |
 | `add_journal_entry` | Adds a comment to any object, with optional template `parameters`. |
-| `classify_ticket` | Only suggests a type from text — changes nothing. |
+| `classify_ticket` | Only suggests a type from text - changes nothing. |
 | `take_over` / `accept` | Claims tickets. Needs `type_name`, the configuration item they belong to. |
 | `forward` | Hands tickets to a `role_id` or `user_id`, optionally applying an OLA. |
 | `pause` | Holds a ticket, optionally stopping the escalation clock (`not_escalate_while_paused`). |
@@ -400,7 +415,7 @@ cannot modify anything even if a model asks it to. When enabled, `ticket_actions
 | `return_to_role` | Gives one ticket back to its responsible role. |
 | `set_deadline` | Sets the date the ticket must be handled by. |
 | `track_working_time` | Books effort, optionally typed (`investigation`, `resolution`, …). |
-| `transform` | Turns tickets into another type — an incident into a service request, say. Rewrites what the record **is**; fields the target type lacks are lost. |
+| `transform` | Turns tickets into another type - an incident into a service request, say. Rewrites what the record **is**; fields the target type lacks are lost. |
 
 Matrix42 wraps its state machine in these named operations rather than exposing a raw state field,
 which is what makes them safe to offer: each carries exactly the parameters its transition needs.
@@ -408,7 +423,7 @@ which is what makes them safe to offer: each carries exactly the parameters its 
 #### Preview, then confirm
 
 Every action previews by default. Called **without** `confirm: true`, a write returns the exact
-request it would send — method, path, body — along with the consequences worth reading, and changes
+request it would send - method, path, body - along with the consequences worth reading, and changes
 nothing:
 
 ```json
@@ -428,7 +443,7 @@ and send another. Pass `dry_run: true` to force a preview even when `confirm` is
 Every created ticket also gets an **internal journal note** recording that it was raised through
 this server. Creating through the API otherwise leaves none of the trace the web interface leaves,
 so a human picking the ticket up has no way to tell where it came from. The note is never
-portal-visible, and if it cannot be written the ticket is still reported as created — losing an
+portal-visible, and if it cannot be written the ticket is still reported as created - losing an
 audit line must never look like a failed create. Turn it off with `M42_AUDIT_NOTE=0`, or name the
 assistant with `M42_AGENT_LABEL="Acme Helpdesk Assistant"`.
 
@@ -440,6 +455,38 @@ Two further defaults exist to prevent the mistakes that matter most in service m
   published to the requester's self-service portal by accident.
 
 `close_related_incidents` also defaults to `false`, since it cascades to other tickets.
+
+### Prompts
+
+Reusable templates your client can offer (in Claude Desktop, the prompts menu). Each one encodes the
+order of operations this server rewards, so a model does not have to rediscover it by failing:
+
+| Prompt | For |
+| --- | --- |
+| `explore_instance` | Getting oriented in an unfamiliar instance |
+| `build_query` | Turning a question into a validated ASQL query |
+| `triage_ticket` | Working one ticket end to end, without changing anything |
+| `safe_change` | Walking a write through preview → confirm |
+| `find_endpoint` | Locating the right operation before writing integration code |
+
+### Resources
+
+The written guides are also published as MCP resources, so a client can read them without a tool
+call and attach one to a conversation up front:
+
+| URI | Contents |
+| --- | --- |
+| `matrix42://guide/data-model` | Matrix42 is one graph, not many modules |
+| `matrix42://guide/schema` | Data definitions, configuration items, fragments, pickups |
+| `matrix42://guide/asql` | The ASQL expression language |
+| `matrix42://guide/api` | REST API conventions: auth, headers, Public vs Product API |
+
+The same text is checked in under [`docs/`](docs/) so it is readable on GitHub without running
+anything - start with **[Matrix42 is one graph, not many modules](docs/matrix42-data-model.md)**,
+which explains why there is no "Licenses" or "SLAs" table and where those records actually live.
+Those files are generated from the guide modules (`npm run docs`), and a test fails if they drift.
+
+---
 
 ## Security notes
 
@@ -503,7 +550,7 @@ src/
   resources.ts       publishes the guides as MCP resources
   prompts.ts         reusable prompt templates
   deep-links.ts      URLs into the Matrix42 web interface (pure string building)
-  write-plan.ts      the request a write would send, as a value — the basis of preview/confirm
+  write-plan.ts      the request a write would send, as a value - the basis of preview/confirm
   tools/             one module per tool, registered from a small registry
 ```
 
@@ -522,7 +569,7 @@ then works in `M42_TOOLS` automatically.
 
 ## Contributing
 
-Contributions are very welcome — this is a community project and it gets better with more instances
+Contributions are very welcome - this is a community project and it gets better with more instances
 behind it. Matrix42 deployments differ enormously, so **a bug report that quotes the exact request
 and the exact error is worth a lot**: it is often the only way to learn that an attribute or an
 operation behaves differently elsewhere.
@@ -539,16 +586,13 @@ Before opening a pull request:
 npm run typecheck && npm test && npm run build
 ```
 
-Please keep the project's two hard rules intact: **never guess an attribute name** (resolve it
-against the live schema), and **never reproduce Matrix42's copyrighted documentation or code** —
-link to it instead. See [CONTRIBUTING.md](CONTRIBUTING.md) for the details.
 
 ## Support
 
 Community support only, through
 [GitHub issues](https://github.com/sus-tech-gmbh/matrix42-mcp/issues) and
 [discussions](https://github.com/sus-tech-gmbh/matrix42-mcp/discussions). There is no SLA, and
-**Matrix42 AG cannot help you with this project** — please do not open a ticket with them about it.
+**Matrix42 AG cannot help you with this project** - please do not open a ticket with them about it.
 
 ## Project
 
@@ -560,11 +604,11 @@ Community support only, through
 | **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
 | **Releases** | [GitHub releases](https://github.com/sus-tech-gmbh/matrix42-mcp/releases) |
 
-Releases are published from CI when a GitHub Release is published, using [npm trusted publishing](https://docs.npmjs.com/trusted-publishers) — no long-lived npm token exists anywhere, and every tarball carries [provenance](https://docs.npmjs.com/generating-provenance-statements) linking it to the commit and workflow run that built it.
+Releases are published from CI when a GitHub Release is published, using [npm trusted publishing](https://docs.npmjs.com/trusted-publishers) - no long-lived npm token exists anywhere, and every tarball carries [provenance](https://docs.npmjs.com/generating-provenance-statements) linking it to the commit and workflow run that built it.
 
 ## Security
 
-Found a vulnerability? Please report it privately rather than in a public issue — see
+Found a vulnerability? Please report it privately rather than in a public issue - see
 [SECURITY.md](SECURITY.md).
 
 ## License
@@ -581,5 +625,5 @@ their respective owners and are used here solely to identify the software this p
 interoperates with. No Matrix42 source code or documentation is redistributed in this repository.
 
 The software is provided "as is", without warranty of any kind. You are responsible for the account
-you configure it with and for anything an assistant does through it — read
+you configure it with and for anything an assistant does through it - read
 [Security notes](#security-notes) before pointing it at a production instance.

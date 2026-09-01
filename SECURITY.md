@@ -13,7 +13,7 @@ Please include what you can: affected version, configuration, a reproduction, an
 believe it has. We will acknowledge your report, keep you updated while we work on it, and credit
 you in the release notes unless you prefer otherwise.
 
-This is a volunteer-maintained community project, so we cannot promise a fixed response time — but
+This is a volunteer-maintained community project, so we cannot promise a fixed response time - but
 security reports go to the front of the queue.
 
 ## Supported versions
@@ -36,7 +36,7 @@ Deploying it responsibly:
 - **Never disable TLS verification in production.** `M42_ALLOW_INSECURE_TLS=1` exists for
   self-signed development instances only.
 - **Treat the token like a password.** Keep it out of shell history, version control and issue
-  reports. A token that has been pasted publicly is compromised — rotate it.
+  reports. A token that has been pasted publicly is compromised - rotate it.
 - **Narrow the surface** with `M42_TOOLS` if you only need part of it.
 
 ## What we consider a vulnerability
@@ -51,4 +51,4 @@ Deploying it responsibly:
 - An assistant reading data the configured account is legitimately entitled to read. That is the
   purpose of the software; scope the account instead.
 - Writes performed by a deployment that enabled writes.
-- Weaknesses in Matrix42 itself — please report those to Matrix42 AG, not here.
+- Weaknesses in Matrix42 itself - please report those to Matrix42 AG, not here.

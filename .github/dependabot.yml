@@ -2,17 +2,24 @@ version: 2
 updates:
   - package-ecosystem: npm
     directory: '/'
+    target-branch: dev
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
+      # Minor and patch bumps batch into one PR. Majors are deliberately excluded so a compiler or
+      # test-runner major arrives on its own and gets reviewed rather than riding along in a group.
       dev-dependencies:
         dependency-type: development
+        update-types:
+          - minor
+          - patch
     commit-message:
       prefix: 'chore(deps)'
 
   - package-ecosystem: github-actions
     directory: '/'
+    target-branch: dev
     schedule:
       interval: monthly
     commit-message:
