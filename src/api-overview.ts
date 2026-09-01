@@ -1,60 +1,75 @@
 // src/api-overview.ts — static guide to Matrix42 REST API conventions, served as a tool action.
 
 /**
- * General "how the Matrix42 REST API works" reference. Returned verbatim by
- * webservice_discovery(action='api_overview') so a model can reason about the API and help
- * write standalone integration code without guessing at auth or headers.
+ * General "how the Matrix42 REST API works" reference, for writing integration code that talks to
+ * Matrix42 directly rather than through this server.
  */
-export const API_OVERVIEW = `# Matrix42 REST API — integration overview
+export const API_OVERVIEW = `# Matrix42 REST API - integration overview
 
-Base path: https://<host>/m42Services/api/...   (the connected host is reported by the server_info tool)
+This describes the Matrix42 REST API itself: how to authenticate against it, which headers it cares
+about, and where its data lives. It is what you need in order to write a script, connector or
+workflow that talks to Matrix42 directly.
 
-IMPORTANT: When you call THIS MCP server's tools, the server already performs the token exchange and
-sets the authentication + localization headers for you. You do NOT need any of the below to use these
-tools. This overview is for reasoning about the API and for helping the user write standalone
-integration code (scripts, connectors, workflows) that talks to Matrix42 directly.
+None of it is needed to use this MCP server's tools. Those already perform the token exchange and
+set the authentication and localisation headers described below. The base path is
+\`https://<host>/m42Services/api/...\`, and the connected host is reported by the \`server_info\` tool.
 
 ## Authentication
-- API token (recommended): create an API token in the Administration application, then exchange it
-  for a short-lived access token:
+
+**API token, recommended.** Create an API token in the Administration application, then exchange it
+for a short-lived access token:
+
     POST m42Services/api/ApiToken/GenerateAccessTokenFromApiToken
     Header: Authorization: Bearer <API_TOKEN>        (empty body, Content-Length: 0)
     Response: { "RawToken": "<access token>", "LifeTime": "<ISO-8601 expiry>" }
-  Then send \`Authorization: Bearer <RawToken>\` on every request and re-exchange once it expires.
-  NOTE: sending the raw API token directly to a normal endpoint does NOT work — it must be exchanged
-  first. A response of 200 with a literal \`null\` body from the exchange means the API token is
-  expired or invalid.
-- Basic auth (discouraged): Authorization: Basic base64(username:password). Some instances accept
-  the credentials but still refuse API access with 403 because of role/audience restrictions.
+
+From there, \`Authorization: Bearer <RawToken>\` goes on every request, and the token is re-exchanged
+once it expires. Sending the raw API token straight to a normal endpoint does not work; it has to be
+exchanged first. If the exchange answers 200 with a literal \`null\` body, the API token is expired or
+invalid.
+
+**Basic auth, discouraged.** \`Authorization: Basic base64(username:password)\`. Some instances accept
+the credentials and still refuse API access with 403, because of role or audience restrictions.
 
 ## Headers
-- Authorization: Bearer <access token>   (or Basic ...)
-- Content-Type: application/json;charset=UTF-8    (required when sending a POST/PUT body)
-- Explicit-Language: de-DE | en-US | ...  — controls the language of the response.
-  NOTE: the standard Accept-Language header is IGNORED by Matrix42; use Explicit-Language.
-  If omitted, Matrix42 falls back to the authenticated user's profile language.
 
-## Methods (CRUD)
-GET = read, POST = create, PUT = update, DELETE = delete. Request bodies must be well-formed JSON;
+    Authorization: Bearer <access token>            (or Basic ...)
+    Content-Type: application/json;charset=UTF-8    (required when sending a POST/PUT body)
+    Explicit-Language: de-DE | en-US | ...          controls the language of the response
+
+The standard Accept-Language header is ignored by Matrix42, so Explicit-Language is the one that
+matters. Omit it and Matrix42 falls back to the authenticated user's profile language.
+
+## Methods
+
+GET reads, POST creates, PUT updates, DELETE deletes. Request bodies must be well-formed JSON;
 malformed JSON is not reported in a helpful way.
 
-## Responses & errors
-2xx = success. 401 = missing/invalid authentication. 403 = authenticated, but the role/audience is
-not permitted (NOT a credentials problem). 406 = the presented token was not accepted (typically a
-raw API token that was never exchanged). 5xx = server error.
+## Responses and errors
+
+    2xx   success
+    401   missing or invalid authentication
+    403   authenticated, but the role or audience is not permitted (not a credentials problem)
+    406   the presented token was not accepted, typically a raw API token that was never exchanged
+    5xx   server error
 
 ## API stability
-Public API = stable and update-safe (operations reported with isPublic = true). Product API = may
-change between releases without notice. Prefer Public operations for integrations.
+
+Operations reported with \`isPublic = true\` are Public API: stable and update-safe. Everything else
+is Product API and may change between releases without notice, which makes the public ones the
+better foundation for an integration that has to keep working.
 
 ## Common data surfaces
-- Fragments:  m42Services/api/data/fragments/<DataDefinition>?Columns=...&Where=...&PageSize=...
-    Columns supports aliases and relation traversal, e.g. "Service.Name AS ServiceName".
-    Where uses A-SQL, e.g. "Service.ID = '<guid>'".
-- DataQuery:  m42Services/api/DataQuery/<dataQueryId>
-- Schema:     m42Services/api/Schema/classes | m42Services/api/Schema/types
+
+    Fragments:  m42Services/api/data/fragments/<DataDefinition>?Columns=...&Where=...&PageSize=...
+    DataQuery:  m42Services/api/DataQuery/<dataQueryId>
+    Schema:     m42Services/api/Schema/classes | m42Services/api/Schema/types
+
+On the fragments endpoint, Columns supports aliases and relation traversal, as in
+\`Service.Name AS ServiceName\`, and Where takes an ASQL expression, as in \`Service.ID = '<guid>'\`.
 
 ## Finding an endpoint
-Call webservice_discovery with action='list_operations' (optionally with a 'search' term) to get every
-operation as {id, name, method, path, service, documentation}, then action='describe_operation' with
-that operation's id for its full parameter and return-type contract.`;
+
+A typical instance exposes on the order of 1,100 operations, so browsing is impractical. Listing
+operations with a search term returns each one as \`{id, name, method, path, service, documentation}\`,
+and describing a single operation by its id gives the full parameter and return-type contract.`;

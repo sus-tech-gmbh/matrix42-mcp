@@ -14,7 +14,7 @@ sexual identity and orientation.
 ## What we expect
 
 - Assume good faith. A confusing report usually means someone is stuck, not careless.
-- Keep criticism about the code, the request or the reasoning — never the person.
+- Keep criticism about the code, the request or the reasoning - never the person.
 - Accept that Matrix42 deployments differ wildly. "It works on mine" is not a rebuttal.
 - Respect a maintainer's "no". This is volunteer-maintained, and scope has to stay finite.
 

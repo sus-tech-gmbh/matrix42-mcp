@@ -4,163 +4,165 @@
 // the official documentation rather than reproducing it.
 
 /**
- * Teaches the ASQL constructs a model needs to write a working filter or column list. Proprietary
- * query languages are where models hallucinate most, so this is served as its own action and is
- * paired with validate_asql.
+ * Explains the ASQL constructs needed to write a working filter or column list, including the
+ * bracketing and sorting quirks that are only discoverable by probing a live instance.
  */
-export const ASQL_GUIDE = `# ASQL — the Matrix42 expression language
+export const ASQL_GUIDE = `# ASQL - the Matrix42 expression language
 
-ASQL is used in two places by the query tool:
-  - \`where\`   — a filter expression, like a SQL WHERE clause
-  - \`columns\` — a comma-separated list of column expressions to return
+ASQL turns up in two places in a fragment query:
 
-Every expression is written against ONE root data definition (the \`class\` you pass to the query).
-Bare identifiers resolve against that class. Identifiers are case-insensitive.
+    where     a filter expression, much like a SQL WHERE clause
+    columns   a comma-separated list of column expressions to return
 
-## Rule 1: never guess an attribute name
+Every expression is written against one root data definition, the class the query names. Bare
+identifiers resolve against that class, and identifiers are case-insensitive.
 
-Attribute sets differ per instance — modules may be absent and customers add their own fields.
-Before writing \`columns\` or \`where\`, read the real attributes with
-schema_discovery(action='describe_data_definition', name='<class>'). A guessed name fails with
+## Attribute names have to come from the instance
+
+Attribute sets differ between instances. Modules may be absent, and customers add fields of their
+own, so there is no portable list to work from. Reading the real attributes of a class before
+writing \`columns\` or \`where\` is the difference between a query that works and one that fails with
 "Class X does not contain attribute Y".
 
-Two quirks worth knowing:
-  - ID is always included for you. Matrix42 sorts by ID and rejects a sort on a column that was not
-    selected, so a projection without it fails.
-  - DisplayString is returned automatically but CANNOT be requested explicitly — asking for it is
-    rejected on every definition. Leave it out of \`columns\`; you will get it anyway.
+Validating an expression before running it is cheaper than a failed query, and the validator
+reports exactly which attribute or construct is wrong.
 
-Validate before you run: call action='validate_asql' with your expression and the class. It reports
-exactly which attribute or construct is wrong, which is far cheaper than a failed query.
+Two quirks are worth knowing up front:
+
+- ID is always included for you. Matrix42 sorts by ID and rejects a sort on a column that was not
+  selected, so a projection without it fails.
+- DisplayString comes back automatically but cannot be requested explicitly. Asking for it is
+  rejected on every definition, so it does not belong in \`columns\` - you will get it either way.
 
 ## Literals and operators
 
-  strings   'single quotes'      (embed a quote by doubling it: 'it''s')
-  dates     #2026-08-21#  or  #2026-08-21 14:12:56#
-  numbers   42, 3.14, 0x1F
-  comments  -- to end of line, or /* block */
+    strings   'single quotes'      (embed a quote by doubling it: 'it''s')
+    dates     #2026-08-21#  or  #2026-08-21 14:12:56#
+    numbers   42, 3.14, 0x1F
+    comments  -- to end of line, or /* block */
 
-  = <> < > <= >=   AND OR NOT   LIKE ('%' wildcard)   IN (...)   IS NULL / IS NOT NULL
-  BETWEEN ... AND ...   EXISTS   CASE WHEN ... THEN ... ELSE ... END
+    = <> < > <= >=   AND OR NOT   LIKE ('%' wildcard)   IN (...)   IS NULL / IS NOT NULL
+    BETWEEN ... AND ...   EXISTS   CASE WHEN ... THEN ... ELSE ... END
 
-Prefer server-side date functions over hardcoded dates:
-  CreatedDate >= DATEADD(day, -30, GETDATE())
+Server-side date functions age better than hardcoded dates:
 
-## Dot chains — following relations
+    CreatedDate >= DATEADD(day, -30, GETDATE())
 
-A relation or pickup attribute can be followed with a dot to reach the target definition:
+## Dot chains, for following relations
 
-  Owner.LastName = 'Smith'
-  Category.DisplayString LIKE 'Network%'
+A relation or pickup attribute can be followed with a dot to reach the definition it points at:
 
-A chain ends at a plain attribute. Pickups behave like relations for chaining.
+    Owner.LastName = 'Smith'
+    Category.DisplayString LIKE 'Network%'
 
-People and roles are relations, not names. A ticket has no InitiatorName column — Initiator,
-Recipient and RecipientRole point at another definition, so filter through them:
+A chain ends at a plain attribute. Pickups behave like relations for the purpose of chaining.
 
-  Initiator.LastName = 'Smith'                              -- SPSUserClassBase behind the relation
-  Recipient.MailAddress LIKE '%@example.com'
-  RecipientRole.T(SPSSecurityClassRole).Name = 'Service Desk'
+People and roles on a ticket are relations, not names, which is the single most common way a filter
+goes wrong here. There is no InitiatorName column on a ticket. Initiator, Recipient and
+RecipientRole all point at another definition, so a filter has to travel through them:
 
-The last one pivots with T(...) because SPSScRoleClassBase carries no attributes of its own. Read the
-target definition with describe_data_definition rather than guessing an attribute name, and check the
-expression with validate_asql before you rely on the result.
+    Initiator.LastName = 'Smith'                              -- SPSUserClassBase behind the relation
+    Recipient.MailAddress LIKE '%@example.com'
+    RecipientRole.T(SPSSecurityClassRole).Name = 'Service Desk'
 
-## Pickups — .Value and .DisplayString
+The last one needs the T(...) pivot because SPSScRoleClassBase carries no attributes of its own.
+
+## Pickups expose .Value and .DisplayString
 
 A pickup attribute exposes both the stored number and its localised label:
 
-  State.Value = 710                -- the underlying integer
-  State.DisplayString = 'Closed'   -- the label, language-dependent
+    State.Value = 710                -- the underlying integer
+    State.DisplayString = 'Closed'   -- the label, language-dependent
 
-Prefer .Value for filters and get the real numbers from
-schema_discovery(action='get_pickup_values') — never guess them, they differ per instance.
+Filters are better built on .Value, since the label depends on the caller's language. The numbers
+themselves differ per instance, so they have to be read from the instance rather than assumed.
 
-## T(...) — pivot to a sibling definition in the same object
+## T(...), for pivoting to a sibling definition
 
 An object is made of several data definitions. From the root class you can pivot to another
-definition of the same configuration item:
+definition belonging to the same configuration item:
 
-  T(SPSCommonClassBase).State.Value = 710
+    T(SPSCommonClassBase).State.Value = 710
 
-Use schema_discovery(action='describe_configuration_item') to see which definitions share the object.
-This is the construct to reach through when the attribute you want lives on a sibling definition.
+This is the construct that reaches an attribute living on a sibling definition. Describing the
+configuration item shows which definitions share the object.
 
-## Brackets — expressions over a related definition
+## Brackets, for expressions over a related definition
 
-  Owner[LastName + ', ' + FirstName]
+    Owner[LastName + ', ' + FirstName]
 
-Opens an expression scope whose context is the target of \`Owner\`. Useful in \`columns\` to build a
-display string in one go.
+This opens an expression scope whose context is the target of \`Owner\`, which is useful in
+\`columns\` for building a display string in one go.
 
-## SUBQUERY(...) — correlated subqueries
+## SUBQUERY(...), for correlated subqueries
 
-  SUBQUERY(<BaseClass> AS <alias>, <TargetAttribute>, <Filter>)
+    SUBQUERY(<BaseClass> AS <alias>, <TargetAttribute>, <Filter>)
 
 Inside the filter, \`<alias>.\` refers to the subquery's base class and \`base.\` refers to the
 enclosing class, so the two can be correlated.
 
-## [Expression-ObjectID] — the bridge to the object
+## [Expression-ObjectID], the bridge to the object
 
 Every data definition used in a configuration item exposes this computed column, holding the id of
-the object the row belongs to. Select it when you need to fetch the whole object afterwards, or to
-correlate rows of different definitions:
+the object the row belongs to. It is what you select when you need to fetch the whole object
+afterwards, or to correlate rows from different definitions:
 
-  columns: 'ID,Subject,[Expression-ObjectID]'
+    columns: 'ID,Subject,[Expression-ObjectID]'
 
-Note that some definitions also have an ordinary attribute called ObjectID holding a human-readable
-key (e.g. an activity number) — that is a different thing.
+Some definitions also have an ordinary attribute called ObjectID, holding a human-readable key such
+as an activity number. That is a different thing entirely.
 
 ## Aliases in columns
 
-  columns: 'ID,Subject,T(SPSCommonClassBase).State.DisplayString AS StateLabel'
+    columns: 'ID,Subject,T(SPSCommonClassBase).State.DisplayString AS StateLabel'
 
-Alias any expression that is not a plain attribute name, so the result key is predictable.
+Any expression that is not a plain attribute name is worth aliasing, so the key in the result is
+predictable rather than derived.
 
-## Rule 2: bracket every identifier
+## Every identifier should be bracketed
 
-The expression parser reserves words that collide with real attribute names. "End" is the
-clearest case — it closes a CASE block, so selecting it bare fails with a syntax error that never
-names the column, even though the attribute exists:
+The expression parser reserves words that collide with real attribute names. "End" is the clearest
+case. It closes a CASE block, so selecting it bare fails with a syntax error that never names the
+column, even though the attribute exists:
 
     Columns=ID,End      -> 500, ExpressionParser syntax error
     Columns=ID,[End]    -> 200
 
-Bracketing a name that is NOT reserved is harmless, so bracket unconditionally rather than keeping
-a keyword list that will go stale. Bracket each segment of a dotted path independently, and the
-alias too, since it is parsed as an identifier in its own right:
+Bracketing a name that is not reserved does no harm, which makes unconditional bracketing safer
+than maintaining a keyword list that will go stale. Each segment of a dotted path is bracketed
+independently, and so is the alias, since it is parsed as an identifier in its own right:
 
     [State].[DisplayString] AS [State]
 
 A dotted expression must carry an AS alias.
 
-## Rule 3: sort names the projected output, unbracketed
+## Sort names the projected output, unbracketed
 
-Sorting is applied to the result of the projection rather than to the table, so a sort clause must
-name whatever the projection emits — the alias where one is applied — and must not be bracketed:
+Sorting applies to the result of the projection rather than to the table, so a sort clause names
+whatever the projection emits - the alias, where one was applied - and is not bracketed:
 
     Columns=[ID],[End] AS [EndedOn]  &  Sort=EndedOn DESC    -> 200
     Columns=[ID],[End] AS [EndedOn]  &  Sort=End DESC        -> 500
 
-## Rule 4: ID in, DisplayString out
+## ID goes in, DisplayString comes out
 
-ID must be in every projection: Matrix42 sorts by it and rejects a sort on a column that was not
-selected. It does not appear in a class’s attribute list, so add it rather than looking it up.
-DisplayString is the mirror image — selecting it explicitly is rejected on every class tested, yet
-it comes back automatically with any projection. Never ask for it.
+ID belongs in every projection: Matrix42 sorts by it and rejects a sort on a column that was not
+selected. It does not appear in a class's attribute list, so it has to be added rather than looked
+up. DisplayString is the mirror image - selecting it explicitly is rejected on every class tested,
+yet it arrives automatically with any projection.
 
-Relation attributes are also absent from the attribute list while remaining selectable, so a
-strict "reject anything not in Attributes" check would block valid columns as well as invalid ones.
+Relation attributes are also absent from the attribute list while remaining selectable, which is
+why a strict "reject anything not in Attributes" check would block valid columns alongside the
+invalid ones.
 
 ## Functions
 
 Aggregates (COUNT, SUM, MIN, MAX), null handling (ISNULL, COALESCE), CAST, and the usual date and
-string functions are available. CURRENTUSERID() and INTERACTIVEUSERID() return the calling user —
-note that with a service API token these usually resolve to no user, so do not rely on them to
-answer "my items" questions.
+string functions are all available. CURRENTUSERID() and INTERACTIVEUSERID() return the calling user,
+but with a service API token they usually resolve to no user at all, so they are not a dependable
+way to answer "my items" questions.
 
 ## Official documentation
 
-Matrix42 documents ASQL at:
-  https://docs.matrix42.com  → search for "ASQL"
-That page is the authoritative reference for the full grammar and function list.`;
+Matrix42 documents ASQL at https://docs.matrix42.com - search there for "ASQL". That page is the
+authoritative reference for the full grammar and function list.`;

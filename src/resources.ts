@@ -1,4 +1,4 @@
-// src/resources.ts — the written guides, published as MCP resources.
+// src/resources.ts - the written guides, published as MCP resources.
 //
 // The same text is reachable through tool actions, but resources make it discoverable: a client can
 // list and read them without calling a tool, and can attach one to a conversation up front. Models
@@ -26,7 +26,7 @@ export const GUIDE_RESOURCES: GuideResource[] = [
     uri: 'matrix42://guide/data-model',
     title: 'Matrix42 is one graph, not many modules',
     description:
-      'How the modules map onto a handful of base classes — where tickets, assets, licenses, contracts, SLAs and catalog items actually live, and the rule against guessing attribute names.',
+      'How the modules map onto a handful of base classes - where tickets, assets, licenses, contracts, SLAs and catalog items actually live, and the rule against guessing attribute names.',
     text: DOMAIN_GUIDE,
   },
   {
@@ -34,7 +34,7 @@ export const GUIDE_RESOURCES: GuideResource[] = [
     uri: 'matrix42://guide/schema',
     title: 'Matrix42 schema model',
     description:
-      'Data definitions vs configuration items, fragments, cardinality and pickups — read before reasoning about Matrix42 data.',
+      'Data definitions vs configuration items, fragments, cardinality and pickups - read before reasoning about Matrix42 data.',
     text: SCHEMA_OVERVIEW,
   },
   {
@@ -49,7 +49,7 @@ export const GUIDE_RESOURCES: GuideResource[] = [
     uri: 'matrix42://guide/api',
     title: 'Matrix42 REST API conventions',
     description:
-      'Authentication, headers, and the Public vs Product API distinction — read before writing standalone Matrix42 integration code.',
+      'Authentication, headers, and the Public vs Product API distinction - read before writing standalone Matrix42 integration code.',
     text: API_OVERVIEW,
   },
 ];

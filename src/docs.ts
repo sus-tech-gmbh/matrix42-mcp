@@ -37,6 +37,6 @@ export function renderDoc(doc: DocFile): string {
 ---
 
 *This is the text the Matrix42 MCP server serves as the resource \`${doc.guide.uri}\`.
-It is generated from \`${doc.source}\` — edit that file and run \`npm run docs\`.*
+It is generated from \`${doc.source}\` - edit that file and run \`npm run docs\`.*
 `;
 }
