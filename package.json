@@ -1,6 +1,7 @@
 {
   "name": "matrix42-mcp",
   "version": "0.1.5",
+  "mcpName": "io.github.sus-tech-gmbh/matrix42-mcp",
   "description": "Model Context Protocol server for Matrix42 — lets AI assistants explore the API, read the data model, search the service desk, and act on tickets",
   "type": "module",
   "license": "MIT",
@@ -24,6 +25,7 @@
     "test": "vitest run",
     "test:live": "vitest run --config vitest.live.config.ts",
     "prepublishOnly": "npm run build",
+    "version": "node scripts/sync-server-json.mjs && git add server.json",
     "docs": "npm run build && node scripts/generate-docs.mjs"
   },
   "keywords": [

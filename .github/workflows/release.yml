@@ -1,7 +1,7 @@
 name: Release
 
-# Publishes to npm when a GitHub Release is published. The release is the human gate: nothing
-# reaches npm until someone deliberately publishes one.
+# Publishes to npm, then lists that version on the MCP Registry, when a GitHub Release is published.
+# The release is the human gate: nothing reaches npm until someone deliberately publishes one.
 #
 # No NPM_TOKEN. This uses npm Trusted Publishing (OIDC), so npm trusts this repository and this
 # workflow file directly, and there is no long-lived credential to leak or rotate.
@@ -74,3 +74,34 @@ jobs:
       # Provenance is generated automatically under OIDC; the flag makes the intent explicit and
       # fails loudly if the conditions for it are ever not met.
       - run: npm publish --provenance --access public
+
+  # Lists the release on the official MCP Registry (registry.modelcontextprotocol.io).
+  #
+  # Also no token: `login github-oidc` exchanges this job's OIDC token, which the registry trusts to
+  # publish under io.github.<repository owner>/*. That is the namespace server.json is named in.
+  #
+  # A separate job so a registry failure never blocks npm, and "Re-run failed jobs" retries only
+  # this. The registry checks the version is on npm and that its package.json carries the matching
+  # mcpName, so it must run after the publish; npm can take a minute to serve a new version, which
+  # is the usual reason for a first-attempt failure here.
+  registry:
+    name: Publish to MCP Registry
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Pinned and checksummed rather than "latest", so the tool holding our publish rights is the
+      # one that was reviewed. Values from the release's registry_<version>_checksums.txt.
+      - name: Install mcp-publisher
+        env:
+          VERSION: v1.8.1
+          SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+        run: |
+          curl -fsSL -o mcp-publisher.tar.gz \
+            "https://github.com/modelcontextprotocol/registry/releases/download/$VERSION/mcp-publisher_linux_amd64.tar.gz"
+          echo "$SHA256  mcp-publisher.tar.gz" | sha256sum -c -
+          tar xzf mcp-publisher.tar.gz mcp-publisher
+
+      - run: ./mcp-publisher login github-oidc
+      - run: ./mcp-publisher publish

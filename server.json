@@ -1,0 +1,81 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.sus-tech-gmbh/matrix42-mcp",
+  "title": "Matrix42",
+  "description": "MCP server for Matrix42: explore the API and data model, search the service desk, act on tickets",
+  "repository": {
+    "url": "https://github.com/sus-tech-gmbh/matrix42-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/sus-tech-gmbh/matrix42-mcp#readme",
+  "version": "0.1.5",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "matrix42-mcp",
+      "version": "0.1.5",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "M42_HOST",
+          "description": "Base URL of the Matrix42 instance",
+          "isRequired": true,
+          "placeholder": "https://matrix42.example.com"
+        },
+        {
+          "name": "M42_API_TOKEN",
+          "description": "API token created in the Matrix42 Administration application",
+          "isRequired": true,
+          "isSecret": true
+        },
+        {
+          "name": "M42_ALLOW_WRITES",
+          "description": "Expose the tools that modify tickets. Off by default, which keeps the server read-only",
+          "format": "boolean",
+          "default": "false"
+        },
+        {
+          "name": "M42_LANGUAGE",
+          "description": "Response language, sent as the Explicit-Language header",
+          "default": "en-US"
+        },
+        {
+          "name": "M42_TOOLS",
+          "description": "Comma-separated tool ids to expose. Left unset, all tools are exposed",
+          "placeholder": "server_info,webservice_discovery"
+        },
+        {
+          "name": "M42_AUDIT_NOTE",
+          "description": "Mark created tickets with an internal note saying they were raised through this server",
+          "format": "boolean",
+          "default": "true"
+        },
+        {
+          "name": "M42_AGENT_LABEL",
+          "description": "How the assistant is named in that note",
+          "default": "Matrix42 MCP server"
+        },
+        {
+          "name": "M42_UI_URL",
+          "description": "Origin of the web interface, for deep links. Discovered from the instance when unset",
+          "placeholder": "https://matrix42.example.com"
+        },
+        {
+          "name": "M42_ALLOW_INSECURE_TLS",
+          "description": "Skip TLS certificate verification. Only for self-signed development instances",
+          "format": "boolean",
+          "default": "false"
+        },
+        {
+          "name": "M42_TIMEOUT_MS",
+          "description": "Per-request timeout in milliseconds",
+          "format": "number",
+          "default": "30000"
+        }
+      ]
+    }
+  ]
+}
