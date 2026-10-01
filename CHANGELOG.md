@@ -6,6 +6,17 @@ Notable changes to this project. Release notes are also generated automatically 
 This project follows [Semantic Versioning](https://semver.org). Until 1.0.0, minor versions may
 contain breaking changes to tool inputs; they will always be called out here.
 
+## Unreleased
+
+### Added
+
+- **Listed on the [MCP Registry](https://registry.modelcontextprotocol.io)** as
+  `io.github.sus-tech-gmbh/matrix42-mcp`. `server.json` describes the entry, including every
+  setting the server reads, so a client installing from the registry can prompt for them. Each
+  release publishes it from CI right after npm, through GitHub OIDC like the npm publish, so there
+  is still no token anywhere. `package.json` gains the `mcpName` the registry checks to confirm the
+  npm package is ours; 0.1.5 and earlier lack it and cannot be listed.
+
 ## 0.1.5 - 2026-08-21
 
 ### Changed
