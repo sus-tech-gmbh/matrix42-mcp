@@ -1,6 +1,6 @@
 {
   "name": "matrix42-mcp",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "mcpName": "io.github.sus-tech-gmbh/matrix42-mcp",
   "description": "Model Context Protocol server for Matrix42 — lets AI assistants explore the API, read the data model, search the service desk, and act on tickets",
   "type": "module",
