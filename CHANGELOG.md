@@ -6,7 +6,7 @@ Notable changes to this project. Release notes are also generated automatically 
 This project follows [Semantic Versioning](https://semver.org). Until 1.0.0, minor versions may
 contain breaking changes to tool inputs; they will always be called out here.
 
-## Unreleased
+## 0.1.6 - 2026-10-01
 
 ### Added
 
