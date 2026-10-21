@@ -7,6 +7,13 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
+      # The client and server each pin an exact @modelcontextprotocol/core, so bumping one alone
+      # installs a second copy of core. Every update type, majors included, so they always move
+      # together. Listed first because a dependency joins the first group it matches, and the
+      # client is a dev dependency that dev-dependencies would otherwise claim.
+      mcp-sdk:
+        patterns:
+          - '@modelcontextprotocol/*'
       # Minor and patch bumps batch into one PR. Majors are deliberately excluded so a compiler or
       # test-runner major arrives on its own and gets reviewed rather than riding along in a group.
       dev-dependencies:
